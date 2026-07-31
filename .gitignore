@@ -24,3 +24,11 @@ pnpm-debug.log*
 
 .env
 .env.local
+
+# Agents related files
+.agents
+.claude
+.goose
+.opencode
+.codex
+skills-lock.json
