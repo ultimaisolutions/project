@@ -14,6 +14,11 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# test output
+test-results/
+playwright-report/
+blob-report/
+
 # environment variables
 .env
 .env.production
@@ -32,3 +37,6 @@ pnpm-debug.log*
 .opencode
 .codex
 skills-lock.json
+.superdesign/tmp/
+.superdesign
+.env*

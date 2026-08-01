@@ -1,0 +1,26 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import UserControl from '../components/UserControl';
+interface Props { title: string; subtitle?: string; status?: string }
+const { title, subtitle, status = 'Google Sheets · קריאה בלבד' } = Astro.props;
+const path = Astro.url.pathname;
+const query = Astro.url.search;
+const analyticsHref = (pathname: string) => `${pathname}${query}`;
+const links = [
+  {href:analyticsHref('/dashboard'),path:'/dashboard',label:'לוח בקרה',icon:'▦'},
+  {href:'/data-settings',path:'/data-settings',label:'הגדרות נתונים',icon:'⚙'},
+  {href:analyticsHref('/ai-insights'),path:'/ai-insights',label:'תובנות AI',icon:'✦'},
+  {href:analyticsHref('/questions'),path:'/questions',label:'שאלות',icon:'?'},
+  {href:analyticsHref('/report'),path:'/report',label:'דוח',icon:'▤'},
+];
+---
+<BaseLayout title={title}>
+  <aside class="sidebar" aria-label="ניווט ראשי"><a class="brand" href="/dashboard"><span class="mark">S</span><span>STSICONIC<small>Business Intelligence</small></span></a><nav>{links.map(l=><a href={l.href} aria-current={path===l.path?'page':undefined} class:list={{active:path===l.path}}><b aria-hidden="true">{l.icon}</b>{l.label}</a>)}</nav><div class="side-foot"><div class="health"><i></i><span>{status}</span></div><UserControl client:load/></div></aside>
+  <header class="mobile-top"><a class="brand" href="/dashboard"><span class="mark">S</span><span>STSICONIC</span></a><UserControl client:load/></header>
+  <main class="page"><header class="page-head"><div><h1>{title}</h1>{subtitle&&<p>{subtitle}</p>}</div><slot name="actions"/></header><slot/></main>
+  <nav class="bottom-nav" aria-label="ניווט נייד">{links.map(l=><a href={l.href} aria-current={path===l.path?'page':undefined} class:list={{active:path===l.path}}><b>{l.icon}</b><span>{l.label}</span></a>)}</nav>
+</BaseLayout>
+<style>
+.sidebar{position:fixed;inset:0 0 0 auto;width:248px;padding:24px 16px;background:var(--bg-sidebar);border-left:1px solid var(--border);display:flex;flex-direction:column;z-index:20}.brand{display:flex;gap:12px;align-items:center;text-decoration:none;font-weight:700;font-size:17px;padding:4px 8px 24px}.brand small{display:block;color:var(--text-muted);font-size:10px;direction:ltr}.mark{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;color:var(--bg-canvas);background:var(--accent);font-size:22px}.sidebar nav{display:grid;gap:6px}.sidebar nav a{position:relative;display:flex;align-items:center;gap:12px;min-height:44px;padding:0 14px;text-decoration:none;color:var(--text-secondary);border-radius:10px}.sidebar nav a:hover,.sidebar nav a.active{color:var(--text-primary);background:var(--surface-2)}.sidebar nav a.active:after{content:"";position:absolute;right:-16px;width:3px;height:24px;background:var(--accent);border-radius:3px}.sidebar nav b{color:var(--accent);width:20px;text-align:center}.side-foot{margin-top:auto;border-top:1px solid var(--border);padding:16px 8px 4px;display:flex;justify-content:space-between;align-items:center}.health{display:flex;gap:8px;align-items:center;color:var(--text-muted);font-size:12px}.health i{width:8px;height:8px;border-radius:50%;background:var(--accent)}.mobile-top,.bottom-nav{display:none}
+@media(max-width:800px){.sidebar{display:none}.mobile-top{position:fixed;display:flex;z-index:20;inset:0 0 auto;min-height:64px;align-items:center;justify-content:space-between;padding:8px 16px;background:var(--bg-sidebar);border-bottom:1px solid var(--border)}.mobile-top .brand{padding:0;font-size:15px}.mobile-top .mark{width:34px;height:34px}.bottom-nav{display:grid;position:fixed;z-index:30;inset:auto 0 0;grid-template-columns:repeat(5,1fr);height:72px;background:var(--bg-sidebar);border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom)}.bottom-nav a{display:grid;place-content:center;gap:2px;text-align:center;text-decoration:none;color:var(--text-muted);font-size:10px}.bottom-nav a b{font-size:18px}.bottom-nav a.active{color:var(--accent)}}
+</style>

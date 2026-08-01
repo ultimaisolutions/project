@@ -1,0 +1,100 @@
+[
+  {
+    "id": "schema.public",
+    "label": "Create schema \"public\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"public\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"public\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "table.sheetConnection",
+    "label": "Create table \"sheetConnection\"",
+    "summary": "Creates table \"sheetConnection\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "sheetConnection"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"sheetConnection\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"sheetConnection\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"sheetConnection\"",
+        "sql": "CREATE TABLE \"public\".\"sheetConnection\" (\n  \"apiKeyEncrypted\" text NOT NULL,\n  \"apiKeyLastFour\" text NOT NULL,\n  \"clerkUserId\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"lastErrorCode\" text,\n  \"lastSyncAt\" timestamptz,\n  \"lastTestedAt\" timestamptz,\n  \"spreadsheetId\" text NOT NULL,\n  \"status\" text DEFAULT 'DISCONNECTED' NOT NULL,\n  \"updatedAt\" timestamptz NOT NULL,\n  \"worksheetName\" text NOT NULL,\n  PRIMARY KEY (\"clerkUserId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"sheetConnection\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"sheetConnection\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.sheetConnection.sheetConnection_status_check",
+    "label": "Add check constraint \"sheetConnection_status_check\" on \"sheetConnection\".\"status\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "sheetConnection_status_check",
+        "table": "sheetConnection"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"sheetConnection_status_check\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "sheetConnection_status_check",
+          "public",
+          "\"public\".\"sheetConnection\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"sheetConnection_status_check\"",
+        "sql": "ALTER TABLE \"public\".\"sheetConnection\" ADD CONSTRAINT \"sheetConnection_status_check\" CHECK (\"status\" IN ('CONNECTED', 'DISCONNECTED', 'FAILED'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"sheetConnection_status_check\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "sheetConnection_status_check",
+          "public",
+          "\"public\".\"sheetConnection\""
+        ]
+      }
+    ]
+  }
+]

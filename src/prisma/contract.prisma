@@ -1,0 +1,21 @@
+// use prisma-next
+
+enum ConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  FAILED
+}
+
+model SheetConnection {
+  clerkUserId       String           @id
+  apiKeyEncrypted   String
+  apiKeyLastFour    String
+  spreadsheetId     String
+  worksheetName     String
+  status            ConnectionStatus @default(DISCONNECTED)
+  lastErrorCode     String?
+  lastTestedAt      DateTime?
+  lastSyncAt        DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         temporal.updatedAt()
+}

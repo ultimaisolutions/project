@@ -1,0 +1,272 @@
+.insight-welcome {
+  min-height: 520px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.insight-welcome > p:not(.eyebrow) {
+  max-width: 650px;
+  color: var(--text-secondary);
+  line-height: 1.75;
+}
+
+.insight-welcome h2 {
+  margin: 8px 0;
+  font-size: clamp(28px, 4vw, 42px);
+}
+
+.insight-welcome small {
+  margin-top: 12px;
+  color: var(--text-muted);
+}
+
+.ai-orb {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(34, 211, 238, .38);
+  border-radius: 24px;
+  background: radial-gradient(circle at 30% 20%, #67e8f9, #0891b2 60%, #164e63);
+  color: #ecfeff;
+  box-shadow: 0 0 55px rgba(34, 211, 238, .28);
+  font-size: 32px;
+}
+
+.eyebrow {
+  margin: 16px 0 0;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+.analyze-button {
+  min-width: 210px;
+  margin-top: 16px;
+}
+
+.spinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  margin-inline-end: 7px;
+  border: 2px solid rgba(7, 17, 31, .35);
+  border-top-color: var(--bg-canvas);
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: spin .8s linear infinite;
+}
+
+.ai-error {
+  width: min(100%, 680px);
+  padding: 12px 14px;
+  border: 1px solid rgba(251, 113, 133, .35);
+  border-radius: 10px;
+  background: var(--negative-soft);
+  color: var(--negative);
+}
+
+.insights-page,
+.insight-section {
+  display: grid;
+  gap: 16px;
+}
+
+.executive-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  padding: 26px;
+  background:
+    radial-gradient(circle at 10% 0, rgba(34, 211, 238, .12), transparent 36%),
+    var(--surface-1);
+}
+
+.executive-summary .eyebrow {
+  margin-top: 0;
+}
+
+.executive-summary h2 {
+  max-width: 920px;
+  margin: 7px 0;
+  font-size: 23px;
+  line-height: 1.55;
+}
+
+.analysis-meta {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.insight-section > header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 8px;
+}
+
+.insight-section > header h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.insight-section > header span {
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.insight-list {
+  display: grid;
+  gap: 12px;
+}
+
+.insight-card {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 14px;
+  padding: 20px;
+}
+
+.insight-index {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.insight-card h3 {
+  margin: 2px 0 5px;
+  font-size: 16px;
+}
+
+.insight-card p,
+.section-empty {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.section-empty {
+  padding: 18px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+}
+
+.insight-card dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 13px 0 0;
+}
+
+.insight-card dl > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 11px;
+}
+
+.insight-card dt {
+  color: var(--text-muted);
+}
+
+.insight-card dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.insight-columns,
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.recommendation-card {
+  padding: 24px;
+}
+
+.recommendation-card .eyebrow {
+  margin-top: 0;
+}
+
+.recommendation-card h2 {
+  margin: 5px 0 14px;
+  font-size: 19px;
+}
+
+.recommendation-card ol,
+.recommendation-card ul {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding-inline-start: 22px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.recommendation-card li::marker {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.recommendation-card.secondary {
+  border-color: rgba(167, 139, 250, .3);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 800px) {
+  .insight-welcome {
+    min-height: 460px;
+    padding: 36px 18px;
+  }
+
+  .executive-summary {
+    display: grid;
+    padding: 20px;
+  }
+
+  .executive-summary .btn {
+    width: 100%;
+  }
+
+  .executive-summary h2 {
+    font-size: 19px;
+  }
+
+  .insight-columns,
+  .action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .insight-card {
+    grid-template-columns: 30px 1fr;
+    padding: 16px;
+  }
+}

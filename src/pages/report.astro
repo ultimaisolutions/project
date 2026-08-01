@@ -1,0 +1,10 @@
+---
+import AppLayout from '../layouts/AppLayout.astro';
+import ImageStudio from '../components/ImageStudio';
+import ReportBuilder from '../components/ReportBuilder';
+---
+<AppLayout title="דוח ניהולי" subtitle="דוח AI מעוצב עם מדדים, חריגות, המלצות וגרפים">
+  <ReportBuilder client:load />
+  <div style="height:16px"></div>
+  <ImageStudio client:load />
+</AppLayout>
