@@ -81,14 +81,32 @@ export function parseSpreadsheetId(input: string) {
   } catch { throw Object.assign(new Error('INVALID_SPREADSHEET'), { code: 'INVALID_SPREADSHEET' }); }
 }
 
+// Both Google calls only depend on arguments we already hold, so they run
+// concurrently to save a round trip. Error precedence stays metadata-first
+// (transport, then WORKSHEET_NOT_FOUND, then values) so the error vocabulary
+// is identical to the previous sequential version.
 export async function fetchGoogleSheet(apiKey: string, spreadsheetId: string, worksheetName: string, signal?: AbortSignal) {
   const metadataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=spreadsheetId,properties.title,sheets.properties.title&key=${encodeURIComponent(apiKey)}`;
-  const metadataResponse = await fetch(metadataUrl, { signal });
-  if (!metadataResponse.ok) throw await mapGoogleError(metadataResponse);
-  const metadata = await metadataResponse.json() as { sheets?: Array<{ properties?: { title?: string } }> };
-  if (!metadata.sheets?.some((sheet) => sheet.properties?.title === worksheetName)) throw Object.assign(new Error('WORKSHEET_NOT_FOUND'), { code: 'WORKSHEET_NOT_FOUND' });
   const valuesUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(worksheetName)}?majorDimension=ROWS&key=${encodeURIComponent(apiKey)}`;
-  const valuesResponse = await fetch(valuesUrl, { signal });
+  const [metadataSettled, valuesSettled] = await Promise.allSettled([
+    fetch(metadataUrl, { signal }),
+    fetch(valuesUrl, { signal }),
+  ]);
+
+  // An unread body leaks the connection, so discard it on every path that
+  // throws before the values response is parsed.
+  const discardValues = () => {
+    if (valuesSettled.status === 'fulfilled') void valuesSettled.value.body?.cancel().catch(() => {});
+  };
+
+  if (metadataSettled.status === 'rejected') { discardValues(); throw metadataSettled.reason; }
+  const metadataResponse = metadataSettled.value;
+  if (!metadataResponse.ok) { discardValues(); throw await mapGoogleError(metadataResponse); }
+  const metadata = await metadataResponse.json() as { sheets?: Array<{ properties?: { title?: string } }> };
+  if (!metadata.sheets?.some((sheet) => sheet.properties?.title === worksheetName)) { discardValues(); throw Object.assign(new Error('WORKSHEET_NOT_FOUND'), { code: 'WORKSHEET_NOT_FOUND' }); }
+
+  if (valuesSettled.status === 'rejected') throw valuesSettled.reason;
+  const valuesResponse = valuesSettled.value;
   if (!valuesResponse.ok) throw await mapGoogleError(valuesResponse);
   const result = await valuesResponse.json() as { values?: string[][] };
   return parseSheet(result.values ?? []);

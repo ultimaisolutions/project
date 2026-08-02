@@ -7,4 +7,4 @@ import '@fontsource/heebo/700.css';
 interface Props { title: string; description?: string }
 const { title, description = 'לוח בקרה פיננסי עסקי' } = Astro.props;
 ---
-<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="description" content={description}/><link rel="icon" href="/favicon.ico"/><title>{title} · STSICONIC</title></head><body><slot/></body></html>
+<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="description" content={description}/><link rel="icon" href="/favicon.ico"/><title>{title} · STSICONIC</title><slot name="head"/></head><body><slot/></body></html>

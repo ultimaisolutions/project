@@ -1,9 +1,11 @@
 import { createHash } from 'node:crypto';
 import { cacheGet, cacheSet } from './cache';
+import { getConnection, markSynced } from './connections';
 import { decryptSecret } from './crypto';
 import { aggregateDashboard, type DashboardFilters } from './dashboard';
 import { getServerEnv } from './env';
 import { fetchGoogleSheet } from './sheets';
+import { noTimings, type Timings } from './timing';
 
 const many = (query: URLSearchParams, key: string) => query.getAll(key)
   .map((value) => value.trim())
@@ -49,9 +51,12 @@ export function filtersFromSearchParams(query: URLSearchParams): DashboardFilter
   };
 }
 
-export async function loadSheetForUser(userId: string, refresh = false) {
-  const { getConnection, markSynced } = await import('./connections');
-  const connection = await getConnection(userId);
+export async function loadSheetForUser(
+  userId: string,
+  refresh = false,
+  timings: Timings = noTimings,
+) {
+  const connection = await timings.measure('db-connection', () => getConnection(userId));
   if (!connection) {
     throw Object.assign(new Error('NOT_CONNECTED'), { code: 'NOT_CONNECTED' });
   }
@@ -73,15 +78,15 @@ export async function loadSheetForUser(userId: string, refresh = false) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
     try {
-      parsed = await fetchGoogleSheet(
+      parsed = await timings.measure('sheets-fetch', () => fetchGoogleSheet(
         decryptSecret(connection.apiKeyEncrypted, userId, encryptionKey),
         connection.spreadsheetId,
         connection.worksheetName,
         controller.signal,
-      );
+      ));
       cacheSet(cacheKey, parsed);
       lastSyncAt = new Date();
-      await markSynced(userId);
+      await timings.measure('db-mark-synced', () => markSynced(userId));
     } finally {
       clearTimeout(timeout);
     }
@@ -103,8 +108,12 @@ export async function loadDashboardForUser(
   userId: string,
   query: URLSearchParams,
   refresh = false,
+  timings: Timings = noTimings,
 ) {
-  const sheet = await loadSheetForUser(userId, refresh);
-  const dashboard = aggregateDashboard(sheet.rows, filtersFromSearchParams(query));
+  const sheet = await loadSheetForUser(userId, refresh, timings);
+  const dashboard = await timings.measure(
+    'aggregate',
+    async () => aggregateDashboard(sheet.rows, filtersFromSearchParams(query)),
+  );
   return { sheet, dashboard };
 }

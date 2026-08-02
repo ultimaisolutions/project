@@ -15,8 +15,9 @@ const links = [
 ];
 ---
 <BaseLayout title={title}>
-  <aside class="sidebar" aria-label="ניווט ראשי"><a class="brand" href="/dashboard"><span class="mark">S</span><span>STSICONIC<small>Business Dashboard</small></span></a><nav>{links.map(l=><a href={l.href} aria-current={path===l.path?'page':undefined} class:list={{active:path===l.path}}><b aria-hidden="true">{l.icon}</b>{l.label}</a>)}</nav><div class="health"><i></i><span>{status}</span></div><div class="side-foot"><UserControl client:load showName/></div></aside>
-  <header class="mobile-top"><a class="brand" href="/dashboard"><span class="mark">S</span><span>STSICONIC</span></a><UserControl client:load/></header>
+  <slot name="head" slot="head"/>
+  <aside class="sidebar" aria-label="ניווט ראשי"><a class="brand" href="/dashboard"><span class="mark">S</span><span>STSICONIC<small>Business Dashboard</small></span></a><nav>{links.map(l=><a href={l.href} aria-current={path===l.path?'page':undefined} class:list={{active:path===l.path}}><b aria-hidden="true">{l.icon}</b>{l.label}</a>)}</nav><div class="health"><i></i><span>{status}</span></div><div class="side-foot"><UserControl client:visible showName/></div></aside>
+  <header class="mobile-top"><a class="brand" href="/dashboard"><span class="mark">S</span><span>STSICONIC</span></a><UserControl client:visible/></header>
   <main class="page"><header class="page-head"><div><h1>{title}</h1>{subtitle&&<p>{subtitle}</p>}</div><slot name="actions"/></header><slot/></main>
   <nav class="bottom-nav" aria-label="ניווט נייד">{links.map(l=><a href={l.href} aria-current={path===l.path?'page':undefined} class:list={{active:path===l.path}}><b>{l.icon}</b><span>{l.label}</span></a>)}</nav>
 </BaseLayout>

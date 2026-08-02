@@ -2,4 +2,19 @@
 import AppLayout from '../layouts/AppLayout.astro';
 import Dashboard from '../components/dashboard/Dashboard';
 ---
-<AppLayout title="לוח בקרה" subtitle="תמונת מצב עסקית מהנתונים המחוברים שלך"><Dashboard client:load/></AppLayout>
+<AppLayout title="לוח בקרה" subtitle="תמונת מצב עסקית מהנתונים המחוברים שלך">
+  <script is:inline slot="head">
+    // Starts the dashboard request while the island bundles are still downloading,
+    // instead of waiting for React to hydrate. The URL must stay byte-identical to
+    // the one built in Dashboard.tsx `load()`, or the island fires a second request.
+    (() => {
+      const query = window.location.search;
+      const promise = fetch(`/api/dashboard${query}${query ? '&' : '?'}refresh=0`);
+      // The island owns the real error handling; this only stops an unhandled
+      // rejection while nothing is awaiting the promise yet.
+      promise.catch(() => {});
+      window.__dashboardPrefetch = promise;
+    })();
+  </script>
+  <Dashboard client:load/>
+</AppLayout>

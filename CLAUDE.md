@@ -51,6 +51,12 @@ Copy `.env.example` → `.env.local`. Required: `PUBLIC_CLERK_PUBLISHABLE_KEY`, 
 
 Browser → React island `Dashboard` → `GET /api/dashboard` → `getConnection(userId)` (Postgres) → decrypt API key → `fetchGoogleSheet` (Google Sheets v4 REST, no SDK) → `parseSheet` → `aggregateDashboard` → JSON → ECharts.
 
+The **initial** request is not started by the island. An inline `<script is:inline slot="head">` in `dashboard.astro` fires it during HTML parse and parks the promise on `window.__dashboardPrefetch`; `Dashboard` consumes it once on mount, then deletes it. This removes ~1.5s of hydration wait from LCP. The kickoff URL must stay byte-identical to the one `load()` builds, or the island issues a duplicate request. Filter changes, manual refresh, and the poll all use the normal `fetch` path. The `head` slot is plumbed `dashboard.astro` → `AppLayout` → `BaseLayout`.
+
+`Chart` is `React.lazy`-loaded so the ~600KB ECharts bundle stays off the KPI paint path; each chart sits in its own `<Suspense>` whose fallback is an empty `.chart-canvas` (fixed 300px) so lazy loading costs no layout shift.
+
+`/api/dashboard` emits `Server-Timing` (`db-connection`, `sheets-fetch`, `db-mark-synced`, `aggregate`) via `createTimings()` in `src/lib/timing.ts` — use it before optimizing server latency by guesswork. `fetchGoogleSheet` issues its metadata and values calls concurrently; the error precedence (metadata transport → `WORKSHEET_NOT_FOUND` → values transport) is load-bearing and must be preserved.
+
 `src/lib/` holds all domain logic and is framework-free — it is the layer worth testing (`tests/domain.test.ts`). API routes in `src/pages/api/` are thin: auth check, Zod parse, call `lib`, wrap with `json()`. `tests/dashboard-ssr.test.tsx` is a smoke test asserting the `Dashboard` island renders under `renderToString` without browser globals; keep new islands SSR-safe (guard `location`/`window` access in render paths).
 
 ### Auth
@@ -95,7 +101,7 @@ Errors are thrown as `Object.assign(new Error(CODE), { code: CODE })` and read b
 - **RTL/Hebrew first.** `dir="rtl"`/`lang="he"` are set once in `BaseLayout.astro`; all user-facing copy is Hebrew. Wrap Latin/numeric runs (currency, dates, IDs, API keys) in `class="ltr"` — it applies `direction:ltr; unicode-bidi:isolate` plus tabular numerals. Format numbers with `Intl` and the `he-IL` locale (`ILS` for currency).
 - **Styling.** No Tailwind. Design tokens are CSS custom properties in `src/styles/global.css`; `.astro` files use scoped `<style>` blocks and React components import a co-located `.css` file. The chart palette in `Chart.tsx` must stay in sync with those tokens.
 - **ECharts** is registered à la carte (`echarts/core` + explicit chart/component imports) to keep the island small — add new chart types to that `echarts.use([...])` list. `AriaComponent` is enabled with Hebrew descriptions; keep new charts accessible.
-- **Islands.** Interactive React is mounted with `client:load` from `.astro` pages; keep pages as thin shells.
+- **Islands.** Interactive React is mounted with `client:load` from `.astro` pages; keep pages as thin shells. Exception: the two `UserControl` instances in `AppLayout.astro` use `client:visible`, because the layout's own media queries `display:none` one of them at every viewport — `client:visible` means the hidden one never hydrates and never pays for Clerk's React bundle.
 - `/ai-insights`, `/questions`, and `/report` are fully implemented authenticated features. Preserve strict AI grounding, visible evidence, structured-output validation, and the explicit image-generation action.
 
 ## Notes

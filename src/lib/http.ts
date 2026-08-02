@@ -1,4 +1,6 @@
-export const json = (data: unknown, status = 200) => new Response(
+import type { Timings } from './timing';
+
+export const json = (data: unknown, status = 200, timings?: Timings) => new Response(
   JSON.stringify(data),
   {
     status,
@@ -6,6 +8,7 @@ export const json = (data: unknown, status = 200) => new Response(
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
       'x-content-type-options': 'nosniff',
+      ...(timings?.header() ? { 'server-timing': timings.header() as string } : {}),
     },
   },
 );

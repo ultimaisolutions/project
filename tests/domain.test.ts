@@ -62,6 +62,67 @@ describe('Google Sheet contract', () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  // The metadata and values calls run concurrently, so both responses exist by the
+  // time errors are inspected. These lock in the metadata-first precedence.
+  test('reports a missing worksheet even though the values call also fails', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: string | URL | Request) => (
+      String(input).includes('/values/')
+        ? new Response(JSON.stringify({ error: { code: 400, status: 'INVALID_ARGUMENT' } }), { status: 400 })
+        : new Response(JSON.stringify({ sheets: [{ properties: { title: 'גיליון אחר' } }] }), { status: 200 })
+    )) as unknown as typeof fetch;
+
+    try {
+      let thrown: unknown;
+      try {
+        await fetchGoogleSheet('AIza-test', 'sheet-id', 'נתונים');
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toMatchObject({ code: 'WORKSHEET_NOT_FOUND' });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('surfaces a values-side failure once the worksheet is confirmed to exist', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: string | URL | Request) => (
+      String(input).includes('/values/')
+        ? new Response(JSON.stringify({ error: { code: 403 } }), { status: 403 })
+        : new Response(JSON.stringify({ sheets: [{ properties: { title: 'נתונים' } }] }), { status: 200 })
+    )) as unknown as typeof fetch;
+
+    try {
+      let thrown: unknown;
+      try {
+        await fetchGoogleSheet('AIza-test', 'sheet-id', 'נתונים');
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toMatchObject({ code: 'PERMISSION_DENIED' });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('parses values when both concurrent calls succeed', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: string | URL | Request) => (
+      String(input).includes('/values/')
+        ? new Response(JSON.stringify({ values: [header, row()] }), { status: 200 })
+        : new Response(JSON.stringify({ sheets: [{ properties: { title: 'נתונים' } }] }), { status: 200 })
+    )) as unknown as typeof fetch;
+
+    try {
+      const result = await fetchGoogleSheet('AIza-test', 'sheet-id', 'נתונים');
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]?.id).toBe('R1727');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
 
 describe('dashboard calculations', () => {

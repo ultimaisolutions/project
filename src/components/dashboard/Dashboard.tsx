@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Chart from './Chart';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePollingRefresh } from './usePollingRefresh';
 import './dashboard.css';
+
+// ECharts is the largest dependency on the page and none of it is needed to
+// paint the KPI grid, so it is kept off the initial island bundle.
+const Chart = lazy(() => import('./Chart'));
 
 const POLL_INTERVAL_MS = 5 * 60_000; // Polls every 5 minutes, change to 10_000 for testing purposes;
 
@@ -189,19 +192,28 @@ export default function Dashboard() {
   const [search, setSearch] = useState('');
   const abort = useRef<AbortController | null>(null);
 
-  const load = useCallback(async (bypass = false) => {
+  const load = useCallback(async (bypass = false, prefetched?: Promise<Response>) => {
     abort.current?.abort();
     const controller = new AbortController();
     abort.current = controller;
     setLoading(true);
     setError(null);
     try {
-      const query = window.location.search;
-      const response = await fetch(
-        `/api/dashboard${query}${query ? '&' : '?'}refresh=${bypass ? '1' : '0'}`,
-        { signal: controller.signal },
-      );
+      const request = () => {
+        const query = window.location.search;
+        return fetch(
+          `/api/dashboard${query}${query ? '&' : '?'}refresh=${bypass ? '1' : '0'}`,
+          { signal: controller.signal },
+        );
+      };
+      // A prefetched request was started before this island existed and carries no
+      // abort signal, so it can fail without any error UI mounted — fall back to a
+      // fresh request rather than surfacing a transient network blip.
+      const response = prefetched ? await prefetched.catch(request) : await request();
       const body = await response.json() as ResponseData & { error?: string };
+      // A prefetched response outlives its abort signal, so drop it explicitly
+      // when a filter change or manual refresh already superseded this load.
+      if (controller.signal.aborted) return;
       if (!response.ok) throw new Error(body.error ?? 'UPSTREAM_ERROR');
       setData(body);
     } catch (caught) {
@@ -215,9 +227,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     setSearch(window.location.search);
-    const timer = window.setTimeout(() => load(), 150);
+    // Handed over by the inline kickoff script in dashboard.astro. Consumed once,
+    // then cleared so refresh/filter/poll loads never replay a stale response.
+    const prefetched = window.__dashboardPrefetch;
+    delete window.__dashboardPrefetch;
+    void load(false, prefetched);
     return () => {
-      window.clearTimeout(timer);
       abort.current?.abort();
     };
   }, [load]);
@@ -399,12 +414,16 @@ export default function Dashboard() {
                 <h2>{title}</h2>
                 <p>{subtitle}</p>
               </header>
-              <Chart
-                kind={kind}
-                data={data.charts[key] ?? []}
-                label={title}
-                valueType={valueType}
-              />
+              {/* .chart-canvas is a fixed 300px box, so the fallback reserves the
+                  exact final height and the lazy load costs no layout shift. */}
+              <Suspense fallback={<div className="chart-canvas" />}>
+                <Chart
+                  kind={kind}
+                  data={data.charts[key] ?? []}
+                  label={title}
+                  valueType={valueType}
+                />
+              </Suspense>
             </article>
           ))}
         </div>
