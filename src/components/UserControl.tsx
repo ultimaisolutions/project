@@ -1,2 +1,29 @@
 import { UserButton } from '@clerk/astro/react';
-export default function UserControl(){return <UserButton appearance={{elements:{avatarBox:{width:'36px',height:'36px'}}}}/>}
+
+interface UserControlProps {
+  showName?: boolean;
+}
+
+export default function UserControl({ showName = false }: UserControlProps) {
+  return (
+    <UserButton
+      showName={showName}
+      appearance={{
+        elements: {
+          // Clerk renders [identifier, avatar]; under dir="rtl" that puts the
+          // name on the right. Reverse so the avatar hugs the sidebar edge.
+          userButtonBox: { flexDirection: 'row-reverse' },
+          userButtonTrigger: { height: 'auto', alignItems: 'center' },
+          userButtonAvatarBox: { width: '36px', height: '36px' },
+          userButtonOuterIdentifier: {
+            maxWidth: '150px',
+            whiteSpace: 'normal',
+            overflowWrap: 'anywhere',
+            lineHeight: 1.25,
+            textAlign: 'start',
+          },
+        },
+      }}
+    />
+  );
+}

@@ -279,22 +279,26 @@ export default function DataSettings() {
               </div>
             </dl>
           </section>
-          <section className="card info-card">
+           {/*I commented out this section because it's not actually needed here, might add it somewhere else later. */}
+          {/* <section className="card info-card">
             <h2>אבטחה ופרטיות</h2>
             <ul>
               <li><b>קריאה בלבד</b><span>המערכת אינה משנה תוכן בגיליון.</span></li>
               <li><b>הצפנה בשרת</b><span>המפתח נשמר בהצפנת AES-256-GCM אישית.</span></li>
               <li><b>ללא שמירת שורות</b><span>מסד הנתונים שומר הגדרות חיבור בלבד.</span></li>
             </ul>
+          </section> */}
+          <section className="card info-card">
+            <details className="card schema-card">
+            <summary>מבנה הגיליון הנדרש · {requiredHeaders.length} עמודות</summary>
+            <p>שורת הכותרות חייבת לכלול את השמות הבאים. מותר להוסיף עמודות נוספות.</p>
+            <div>{requiredHeaders.map((header) => <code key={header}>{header}</code>)}</div>
+            </details>
           </section>
         </aside>
       </div>
 
-      <details className="card schema-card">
-        <summary>מבנה הגיליון הנדרש · {requiredHeaders.length} עמודות</summary>
-        <p>שורת הכותרות חייבת לכלול את השמות הבאים. מותר להוסיף עמודות נוספות.</p>
-        <div>{requiredHeaders.map((header) => <code key={header}>{header}</code>)}</div>
-      </details>
+      
     </div>
   );
 }
