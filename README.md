@@ -70,7 +70,7 @@ The first row must include these exact headers; additional columns are allowed:
 
 Dates use `DD/MM/YYYY`. Duplicate/missing row IDs and invalid dates are skipped. Blank numeric cells remain `null`, numeric zero remains `0`, and blank dimensions become `לא צוין`.
 
-## Local development
+## Local development - Quickstart
 
 Requirements: Node 24.x, Bun 1.3 or newer, a Clerk development instance, PostgreSQL/Neon, Google Sheets API access, OpenRouter, and OpenAI.
 
@@ -81,7 +81,8 @@ cp .env.example .env.local
 bun run migrate
 bun run dev
 ```
-
+If you're linked to the vercel project, use `vercel env pull` instead of `cp .env.example .env.local` - that will create an .env.local file and pull the env variables
+straight from vercel.
 Clerk should enable Google and/or email-password authentication, self-service sign-up, and `http://localhost:4321/sign-in/sso-callback` for local OAuth callbacks.
 
 ### Environment variables
