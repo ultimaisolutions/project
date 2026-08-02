@@ -11,6 +11,7 @@ type Settings = {
   lastSyncAt: string | null;
   lastErrorCode: string | null;
   serverDefaultsAvailable: boolean;
+  connectionSource: 'environment' | 'user' | 'none';
 };
 
 const requiredHeaders = [
@@ -52,7 +53,7 @@ export default function DataSettings() {
   const [apiKey, setApiKey] = useState('');
   const [spreadsheet, setSpreadsheet] = useState('');
   const [worksheet, setWorksheet] = useState('');
-  const [busy, setBusy] = useState<'test' | 'save' | 'server' | 'delete' | null>(null);
+  const [busy, setBusy] = useState<'test' | 'save' | 'default' | 'delete' | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [loadError, setLoadError] = useState(false);
 
@@ -83,7 +84,7 @@ export default function DataSettings() {
   });
 
   /** Tests, saves, or attaches server-default connection settings and reports the outcome. */
-  const action = async (kind: 'test' | 'save' | 'server') => {
+  const action = async (kind: 'test' | 'save' | 'default') => {
     setBusy(kind);
     setMessage(null);
     try {
@@ -92,7 +93,7 @@ export default function DataSettings() {
         {
           method: kind === 'test' ? 'POST' : 'PUT',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(kind === 'server'
+          body: JSON.stringify(kind === 'default'
             ? { useServerDefaults: true }
             : payload()),
         },
@@ -115,8 +116,8 @@ export default function DataSettings() {
         setApiKey('');
         setMessage({
           type: 'success',
-          text: kind === 'server'
-            ? 'מקור הנתונים המוגדר במערכת חובר לחשבון בהצלחה.'
+          text: kind === 'default'
+            ? 'ברירת המחדל של המערכת שוחזרה בהצלחה.'
             : 'החיבור נשמר בהצלחה.',
         });
       }
@@ -139,7 +140,7 @@ export default function DataSettings() {
 
   /** Confirms and removes the user's stored connection, then clears local form state. */
   const disconnect = async () => {
-    if (!confirm('לנתק את מקור הנתונים? הפעולה תמחק את פרטי החיבור המוצפנים.')) return;
+    if (!confirm('לנתק את מקור הנתונים מהחשבון? ניתן לחבר שוב או לשחזר את ברירת המחדל.')) return;
     setBusy('delete');
     setMessage(null);
     try {
@@ -148,8 +149,8 @@ export default function DataSettings() {
       if (!response.ok) throw new Error();
       setSettings(data);
       setApiKey('');
-      setSpreadsheet('');
-      setWorksheet('');
+      setSpreadsheet(data.spreadsheetId);
+      setWorksheet(data.worksheetName);
       setMessage({ type: 'success', text: 'מקור הנתונים נותק מהחשבון.' });
     } catch {
       setMessage({ type: 'error', text: 'ניתוק מקור הנתונים נכשל. נסו שוב.' });
@@ -178,21 +179,6 @@ export default function DataSettings() {
 
   return (
     <div className="settings-page">
-      {settings.serverDefaultsAvailable && !settings.apiKeyConfigured && (
-        <section className="card quick-connect">
-          <div>
-            <span aria-hidden="true">↗</span>
-            <div>
-              <h2>מקור הנתונים של סביבת ההדגמה מוכן</h2>
-              <p>אפשר לחבר אותו לחשבון בלי להציג או להעתיק מפתחות API.</p>
-            </div>
-          </div>
-          <button className="btn primary" disabled={!!busy} onClick={() => void action('server')}>
-            {busy === 'server' ? 'מחבר ובודק…' : 'חיבור למקור המוגדר'}
-          </button>
-        </section>
-      )}
-
       <div className="settings-grid">
         <form className="card settings-card" onSubmit={submit}>
           <header>
@@ -203,10 +189,12 @@ export default function DataSettings() {
             <span className={`status ${settings.status.toLowerCase()}`}>
               <i />
               {settings.status === 'CONNECTED'
-                ? 'מחובר'
+                ? settings.connectionSource === 'environment'
+                  ? 'מקור מערכת'
+                  : 'חיבור מותאם'
                 : settings.status === 'FAILED'
                   ? 'חיבור נכשל'
-                  : 'לא מחובר'}
+                  : 'מנותק'}
             </span>
           </header>
           <label>
@@ -222,7 +210,9 @@ export default function DataSettings() {
               />
               <small>
                 {settings.apiKeyConfigured
-                  ? 'השארת השדה ריק תשמור את המפתח המוצפן הקיים.'
+                  ? settings.connectionSource === 'environment'
+                    ? 'השארת השדה ריק תשתמש במפתח המוגן של המערכת.'
+                    : 'השארת השדה ריק תשמור את המפתח המוצפן הקיים.'
                   : 'המפתח יוצפן בשרת ולעולם לא יוצג שוב.'}
               </small>
             </span>
@@ -262,7 +252,12 @@ export default function DataSettings() {
             <button className="btn primary" disabled={!!busy}>
               {busy === 'save' ? 'שומר ובודק…' : 'שמירת חיבור'}
             </button>
-            {settings.apiKeyConfigured && (
+            {settings.serverDefaultsAvailable && settings.connectionSource !== 'environment' && (
+              <button className="btn restore-default" type="button" disabled={!!busy} onClick={() => void action('default')}>
+                {busy === 'default' ? 'משחזר…' : 'שחזור ברירת מחדל'}
+              </button>
+            )}
+            {settings.connectionSource !== 'none' && (
               <button className="btn danger disconnect" type="button" disabled={!!busy} onClick={() => void disconnect()}>
                 {busy === 'delete' ? 'מנתק…' : 'ניתוק'}
               </button>
@@ -274,6 +269,7 @@ export default function DataSettings() {
           <section className="card info-card">
             <h2>מצב מקור הנתונים</h2>
             <dl className="source-status">
+              <div><dt>מקור</dt><dd>{settings.connectionSource === 'environment' ? 'ברירת מחדל' : settings.connectionSource === 'user' ? 'מותאם אישית' : 'מנותק'}</dd></div>
               <div><dt>לשונית</dt><dd>{settings.worksheetName || 'טרם הוגדרה'}</dd></div>
               <div>
                 <dt>בדיקת חיבור</dt>

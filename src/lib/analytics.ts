@@ -1,9 +1,12 @@
 import { createHash } from 'node:crypto';
 import { cacheGet, cacheSet } from './cache';
 import { getConnection, markSynced } from './connections';
-import { decryptSecret } from './crypto';
 import { aggregateDashboard, type DashboardFilters } from './dashboard';
 import { getServerEnv } from './env';
+import {
+  configuredSheetDefaults,
+  resolveEffectiveSheetConnection,
+} from './server-settings';
 import { fetchGoogleSheet } from './sheets';
 import { noTimings, type Timings } from './timing';
 
@@ -19,7 +22,7 @@ const date = (value: string | null) => value && /^\d{4}-\d{2}-\d{2}$/.test(value
   : undefined;
 
 type ConnectionCacheIdentity = {
-  apiKeyEncrypted: string;
+  apiKey: string;
   spreadsheetId: string;
   worksheetName: string;
   updatedAt?: unknown;
@@ -35,7 +38,7 @@ export function connectionCacheKey(
   connection: ConnectionCacheIdentity,
 ) {
   const revision = createHash('sha256')
-    .update(connection.apiKeyEncrypted)
+    .update(connection.apiKey)
     .update('\0')
     .update(connection.spreadsheetId)
     .update('\0')
@@ -44,6 +47,31 @@ export function connectionCacheKey(
     .slice(0, 24);
   return `${userId}:${revision}`;
 }
+
+type ParsedSheet = Awaited<ReturnType<typeof fetchGoogleSheet>>;
+type SheetCacheEntry = { parsed: ParsedSheet; lastSyncAt: Date };
+
+type SheetLoaderDependencies = {
+  getConnection: typeof getConnection;
+  configuredSheetDefaults: typeof configuredSheetDefaults;
+  getEncryptionKey: () => string | undefined;
+  cacheGet: typeof cacheGet;
+  cacheSet: typeof cacheSet;
+  fetchGoogleSheet: typeof fetchGoogleSheet;
+  markSynced: typeof markSynced;
+  now: () => Date;
+};
+
+const sheetLoaderDependencies: SheetLoaderDependencies = {
+  getConnection,
+  configuredSheetDefaults,
+  getEncryptionKey: () => getServerEnv('SETTINGS_ENCRYPTION_KEY'),
+  cacheGet,
+  cacheSet,
+  fetchGoogleSheet,
+  markSynced,
+  now: () => new Date(),
+};
 
 /** Converts dashboard URL parameters into normalized, bounded filters. */
 export function filtersFromSearchParams(query: URLSearchParams): DashboardFilters {
@@ -62,57 +90,70 @@ export function filtersFromSearchParams(query: URLSearchParams): DashboardFilter
  * Loads the user's configured worksheet, reusing cached parsed rows unless a refresh
  * is requested, and records successful upstream synchronizations.
  */
-export async function loadSheetForUser(
+export async function loadSheetForUserWithDependencies(
   userId: string,
   refresh = false,
   timings: Timings = noTimings,
+  dependencies: SheetLoaderDependencies = sheetLoaderDependencies,
 ) {
-  const connection = await timings.measure('db-connection', () => getConnection(userId));
+  const stored = await timings.measure(
+    'db-connection',
+    () => dependencies.getConnection(userId),
+  );
+  const connection = resolveEffectiveSheetConnection(
+    userId,
+    stored,
+    dependencies.configuredSheetDefaults(),
+    dependencies.getEncryptionKey(),
+  );
   if (!connection) {
     throw Object.assign(new Error('NOT_CONNECTED'), { code: 'NOT_CONNECTED' });
   }
 
   const cacheKey = connectionCacheKey(userId, connection);
-  let parsed = refresh
+  let cached = refresh
     ? null
-    : cacheGet<Awaited<ReturnType<typeof fetchGoogleSheet>>>(cacheKey);
-  let lastSyncAt = connection.lastSyncAt ? new Date(connection.lastSyncAt) : null;
+    : dependencies.cacheGet<SheetCacheEntry>(cacheKey);
 
-  if (!parsed) {
-    const encryptionKey = getServerEnv('SETTINGS_ENCRYPTION_KEY');
-    if (!encryptionKey) {
-      throw Object.assign(new Error('SERVER_CONFIGURATION'), {
-        code: 'SERVER_CONFIGURATION',
-      });
-    }
-
+  if (!cached) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
     try {
-      parsed = await timings.measure('sheets-fetch', () => fetchGoogleSheet(
-        decryptSecret(connection.apiKeyEncrypted, userId, encryptionKey),
+      const parsed = await timings.measure('sheets-fetch', () => dependencies.fetchGoogleSheet(
+        connection.apiKey,
         connection.spreadsheetId,
         connection.worksheetName,
         controller.signal,
       ));
-      cacheSet(cacheKey, parsed);
-      lastSyncAt = new Date();
-      await timings.measure('db-mark-synced', () => markSynced(userId));
+      cached = { parsed, lastSyncAt: dependencies.now() };
+      dependencies.cacheSet(cacheKey, cached);
+      if (connection.source === 'user') {
+        await timings.measure('db-mark-synced', () => dependencies.markSynced(userId));
+      }
     } finally {
       clearTimeout(timeout);
     }
   }
 
   return {
-    rows: parsed.rows,
-    skippedRows: parsed.skippedRows,
-    warnings: parsed.warnings,
-    lastSyncAt,
+    rows: cached.parsed.rows,
+    skippedRows: cached.parsed.skippedRows,
+    warnings: cached.parsed.warnings,
+    lastSyncAt: cached.lastSyncAt,
     source: {
       spreadsheetId: connection.spreadsheetId,
       worksheetName: connection.worksheetName,
     },
   };
+}
+
+/** Loads the effective user or environment-backed worksheet. */
+export async function loadSheetForUser(
+  userId: string,
+  refresh = false,
+  timings: Timings = noTimings,
+) {
+  return loadSheetForUserWithDependencies(userId, refresh, timings);
 }
 
 /** Loads the user's worksheet and aggregates it using filters from the request URL. */

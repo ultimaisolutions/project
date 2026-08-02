@@ -83,7 +83,7 @@ describe('analytics request parsing', () => {
 describe('analytics connection cache identity', () => {
   test('ignores sync timestamps but changes when the actual Sheet connection changes', () => {
     const connection = {
-      apiKeyEncrypted: 'encrypted-key-a',
+      apiKey: 'plain-server-key-a',
       spreadsheetId: 'sheet-a',
       worksheetName: 'נתונים',
     };

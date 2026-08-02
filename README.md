@@ -4,7 +4,7 @@ Hebrew-first, right-to-left marketing and sales dashboard built from the require
 
 ## Product capabilities
 
-- Authenticated, per-user Google Sheets connection settings with masked keys and AES-256-GCM encryption bound to the Clerk user ID.
+- Zero-configuration shared Google Sheets defaults from server environment variables, with optional per-user overrides whose keys are masked and encrypted with AES-256-GCM bound to the Clerk user ID.
 - Ten management KPIs: spend, revenue, leads, deals, lead-to-deal conversion, cost per lead, cost per deal, ROI, leading campaign, and leading channel.
 - Revenue/spend trend, leads by channel, conversion by campaign, revenue by salesperson, product performance, funnel, campaign, channel, and region charts.
 - Combined date, campaign, channel, salesperson, region, and product/service filters with URL persistence and clear-all.
@@ -94,13 +94,15 @@ Clerk should enable Google and/or email-password authentication, self-service si
 | `SETTINGS_ENCRYPTION_KEY` | Base64-encoded 32-byte key for Sheet API-key encryption |
 | `OPENROUTER_API_KEY` | Server-only OpenRouter key for `deepseek/deepseek-v4-flash` |
 | `OPENAI_API_KEY` | Server-only OpenAI key for `gpt-image-2` |
-| `GOOGLE_SHEETS_API` | Optional server-side demo Google Sheets API key |
-| `SHEET_ID` | Optional native demo Google Sheet ID |
-| `SHEET_NAME` | Optional demo worksheet name, normally `נתונים` |
+| `GOOGLE_SHEETS_API` | Shared server-only Google Sheets API key used automatically for users without an override |
+| `SHEET_ID` | Shared native Google Sheet ID used automatically for users without an override |
+| `SHEET_NAME` | Shared worksheet name, normally `נתונים` |
 | `PUBLIC_SITE_URL` | OpenRouter application attribution URL |
 | `CLERK_SIGN_IN_URL` | Clerk sign-in route (`/sign-in`) |
 | `CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | Post-sign-in route (`/dashboard`) |
 | `CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | Post-sign-up route (`/dashboard`) |
+
+The three shared Sheet variables are all-or-nothing: when the complete set is present, a newly authenticated user can open the dashboard immediately without visiting data settings. A saved per-user override takes precedence; an explicit disconnect suppresses the shared fallback until the user reconnects or restores the system default.
 
 Generate the encryption value with `openssl rand -base64 32`. Never commit `.env.local` or provider/database credentials.
 
