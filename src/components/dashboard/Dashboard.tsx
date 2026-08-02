@@ -110,6 +110,7 @@ const errorMessages: Record<string, { title: string; body: string }> = {
   },
 };
 
+/** Formats a KPI value for its configured number, currency, or percentage type. */
 function format(value: number | null, type: string) {
   if (value == null) return '—';
   if (type === 'currency') return currencyFormatter.format(value);
@@ -117,11 +118,13 @@ function format(value: number | null, type: string) {
   return numberFormatter.format(value);
 }
 
+/** Formats an ISO calendar date for Hebrew display without shifting its UTC day. */
 function displayDate(value?: string) {
   if (!value) return '—';
   return new Intl.DateTimeFormat('he-IL').format(new Date(`${value}T00:00:00Z`));
 }
 
+/** Renders date and multi-select controls backed by the dashboard URL parameters. */
 function FilterControls({
   data,
   params,
@@ -184,6 +187,7 @@ function FilterControls({
   );
 }
 
+/** Loads and renders the filterable, polling Google Sheets analytics dashboard. */
 export default function Dashboard() {
   const [data, setData] = useState<ResponseData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -192,6 +196,7 @@ export default function Dashboard() {
   const [search, setSearch] = useState('');
   const abort = useRef<AbortController | null>(null);
 
+  /** Loads dashboard data, superseding stale requests and optionally bypassing the cache. */
   const load = useCallback(async (bypass = false, prefetched?: Promise<Response>) => {
     abort.current?.abort();
     const controller = new AbortController();
@@ -199,6 +204,7 @@ export default function Dashboard() {
     setLoading(true);
     setError(null);
     try {
+      /** Starts a dashboard request using the latest browser URL filters. */
       const request = () => {
         const query = window.location.search;
         return fetch(
@@ -245,6 +251,7 @@ export default function Dashboard() {
     [params],
   );
 
+  /** Writes filter parameters to browser history and reloads dashboard data. */
   const commitParams = (next: URLSearchParams) => {
     const query = next.toString();
     window.history.replaceState(null, '', query ? `${window.location.pathname}?${query}` : window.location.pathname);
@@ -252,6 +259,7 @@ export default function Dashboard() {
     void load();
   };
 
+  /** Sets or removes one inclusive date boundary. */
   const onDate = (key: 'from' | 'to', value: string) => {
     const next = new URLSearchParams(window.location.search);
     if (value) next.set(key, value);
@@ -259,6 +267,7 @@ export default function Dashboard() {
     commitParams(next);
   };
 
+  /** Adds or removes one selected dimension value while preserving its peers. */
   const onToggle = (key: FilterKey, value: string, checked: boolean) => {
     const next = new URLSearchParams(window.location.search);
     const values = next.getAll(key).filter((item) => item !== value);
@@ -268,6 +277,7 @@ export default function Dashboard() {
     commitParams(next);
   };
 
+  /** Removes one active date or dimension filter chip. */
   const remove = (key: string, value: string) => {
     const next = new URLSearchParams(window.location.search);
     if (key === 'from' || key === 'to') {
@@ -280,6 +290,7 @@ export default function Dashboard() {
     commitParams(next);
   };
 
+  /** Clears every dashboard filter and reloads the default date window. */
   const clearAll = () => commitParams(new URLSearchParams());
 
   if (loading && !data) {

@@ -21,6 +21,7 @@ const fieldMap: Record<(typeof REQUIRED_HEADERS)[number], keyof SheetRow> = {
 const numericFields = new Set<keyof SheetRow>(['budget', 'actualSpend', 'impressions', 'clicks', 'leads', 'meetings', 'deals', 'revenue']);
 const dimensionFields = new Set<keyof SheetRow>(['campaign', 'channel', 'salesperson', 'region', 'product']);
 
+/** Parses a strict `DD/MM/YYYY` value into an ISO date, rejecting impossible dates. */
 function parseDate(value: string) {
   const match = value.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (!match) return null;
@@ -30,6 +31,7 @@ function parseDate(value: string) {
   return date.toISOString().slice(0, 10);
 }
 
+/** Parses a formatted numeric cell, preserving blank or invalid values as `null`. */
 function parseNumber(value: string) {
   const clean = value.replace(/[₪$,€£\u00a0\s]/g, '').trim();
   if (!clean) return null;
@@ -37,6 +39,10 @@ function parseNumber(value: string) {
   return Number.isFinite(number) ? number : null;
 }
 
+/**
+ * Validates the required worksheet headers and converts valid source rows into the
+ * dashboard schema, skipping missing, duplicate, or invalid row identities.
+ */
 export function parseSheet(values: string[][]) {
   const headers = values[0] ?? [];
   const missing = REQUIRED_HEADERS.filter((name) => !headers.includes(name));
@@ -69,6 +75,7 @@ export function parseSheet(values: string[][]) {
   return { rows, skippedRows, warnings: hasBlankNumeric ? ['BLANK_NUMERIC_VALUES'] : [] };
 }
 
+/** Extracts a Google spreadsheet ID from either a raw ID or a canonical Sheets URL. */
 export function parseSpreadsheetId(input: string) {
   const value = input.trim();
   if (/^[\w-]{8,}$/.test(value)) return value;
@@ -81,10 +88,10 @@ export function parseSpreadsheetId(input: string) {
   } catch { throw Object.assign(new Error('INVALID_SPREADSHEET'), { code: 'INVALID_SPREADSHEET' }); }
 }
 
-// Both Google calls only depend on arguments we already hold, so they run
-// concurrently to save a round trip. Error precedence stays metadata-first
-// (transport, then WORKSHEET_NOT_FOUND, then values) so the error vocabulary
-// is identical to the previous sequential version.
+/**
+ * Fetches worksheet metadata and values concurrently, verifies the requested tab,
+ * and parses its rows. Error precedence remains metadata-first.
+ */
 export async function fetchGoogleSheet(apiKey: string, spreadsheetId: string, worksheetName: string, signal?: AbortSignal) {
   const metadataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=spreadsheetId,properties.title,sheets.properties.title&key=${encodeURIComponent(apiKey)}`;
   const valuesUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(worksheetName)}?majorDimension=ROWS&key=${encodeURIComponent(apiKey)}`;
@@ -112,6 +119,7 @@ export async function fetchGoogleSheet(apiKey: string, spreadsheetId: string, wo
   return parseSheet(result.values ?? []);
 }
 
+/** Maps Google API responses to the application's sanitized sheet error vocabulary. */
 async function mapGoogleError(response: Response) {
   const body = await response.json().catch(() => null) as {
     error?: { status?: string; message?: string };

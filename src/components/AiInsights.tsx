@@ -51,6 +51,7 @@ const percent = new Intl.NumberFormat('he-IL', {
   maximumFractionDigits: 1,
 });
 
+/** Formats one grounded evidence value according to its declared display type. */
 function formatEvidence(item: Evidence) {
   if (item.value == null) return 'אין נתון';
   if (item.format === 'currency') return currency.format(item.value as number);
@@ -62,6 +63,7 @@ function formatEvidence(item: Evidence) {
   return String(item.value);
 }
 
+/** Renders a titled insight collection with the evidence supporting each item. */
 function InsightCards({
   title,
   items,
@@ -110,11 +112,13 @@ function InsightCards({
   );
 }
 
+/** Provides the interactive, filter-aware AI insights experience. */
 export default function AiInsights() {
   const [result, setResult] = useState<InsightsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** Requests a fresh grounded analysis for the filters in the current URL. */
   const analyze = async () => {
     setLoading(true);
     setError(null);

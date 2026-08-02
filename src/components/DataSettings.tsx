@@ -46,6 +46,7 @@ const errorMessages: Record<string, string> = {
   INVALID_INPUT: 'יש להשלים את כל השדות ולבדוק את הערכים.',
 };
 
+/** Manages the user's encrypted, read-only Google Sheets connection settings. */
 export default function DataSettings() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [apiKey, setApiKey] = useState('');
@@ -55,6 +56,7 @@ export default function DataSettings() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [loadError, setLoadError] = useState(false);
 
+  /** Loads the user's public, secret-free connection settings into the form. */
   const loadSettings = async () => {
     setLoadError(false);
     try {
@@ -73,12 +75,14 @@ export default function DataSettings() {
     void loadSettings();
   }, []);
 
+  /** Builds the connection payload, omitting a blank key so an existing key is retained. */
   const payload = () => ({
     apiKey: apiKey || undefined,
     spreadsheetId: spreadsheet,
     worksheetName: worksheet,
   });
 
+  /** Tests, saves, or attaches server-default connection settings and reports the outcome. */
   const action = async (kind: 'test' | 'save' | 'server') => {
     setBusy(kind);
     setMessage(null);
@@ -127,11 +131,13 @@ export default function DataSettings() {
     }
   };
 
+  /** Prevents native form navigation and saves the current connection fields. */
   const submit = (event: SyntheticEvent<HTMLFormElement, SubmitEvent>) => {
     event.preventDefault();
     void action('save');
   };
 
+  /** Confirms and removes the user's stored connection, then clears local form state. */
   const disconnect = async () => {
     if (!confirm('לנתק את מקור הנתונים? הפעולה תמחק את פרטי החיבור המוצפנים.')) return;
     setBusy('delete');

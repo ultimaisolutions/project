@@ -4,6 +4,7 @@ interface UserControlProps {
   showName?: boolean;
 }
 
+/** Renders Clerk's user menu with RTL-aware avatar and identifier placement. */
 export default function UserControl({ showName = false }: UserControlProps) {
   return (
     <UserButton

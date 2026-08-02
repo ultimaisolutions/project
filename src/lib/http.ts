@@ -1,5 +1,6 @@
 import type { Timings } from './timing';
 
+/** Creates a non-cacheable JSON response with security and optional timing headers. */
 export const json = (data: unknown, status = 200, timings?: Timings) => new Response(
   JSON.stringify(data),
   {
@@ -13,6 +14,7 @@ export const json = (data: unknown, status = 200, timings?: Timings) => new Resp
   },
 );
 
+/** Returns a safe public error code, replacing unknown or malformed codes. */
 export const errorCode = (error: unknown) => (
   typeof error === 'object'
   && error
@@ -23,6 +25,7 @@ export const errorCode = (error: unknown) => (
     : 'UPSTREAM_ERROR'
 );
 
+/** Rejects cross-origin or non-JSON requests before a JSON endpoint reads its body. */
 export function assertJson(request: Request) {
   const origin = request.headers.get('origin');
   if (origin && origin !== new URL(request.url).origin) {

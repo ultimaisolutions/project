@@ -11,16 +11,19 @@ export function usePollingRefresh(onPoll: () => void, intervalMs: number): void 
   callback.current = onPoll;
 
   useEffect(() => {
+    /** Records and invokes the latest polling callback. */
     const run = () => {
       lastRunAt.current = Date.now();
       callback.current();
     };
 
+    /** Runs a scheduled poll only while the document is visible. */
     const tick = () => {
       if (document.hidden) return;
       run();
     };
 
+    /** Catches up after visibility returns when the interval has already elapsed. */
     const onVisible = () => {
       if (document.hidden) return;
       if (Date.now() - lastRunAt.current < intervalMs) return;

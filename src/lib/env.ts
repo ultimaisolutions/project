@@ -10,6 +10,7 @@ export type ServerEnvName =
   | 'PUBLIC_SITE_URL'
   | 'VERCEL_PROJECT_PRODUCTION_URL';
 
+/** Resolves a server setting with Vite taking precedence, trimming blank values away. */
 export function resolveServerEnv(
   viteValue: string | undefined,
   processValue: string | undefined,
@@ -17,6 +18,7 @@ export function resolveServerEnv(
   return viteValue?.trim() || processValue?.trim() || undefined;
 }
 
+/** Reads an allowed server-only environment variable from Vite or the Node process. */
 export function getServerEnv(name: ServerEnvName) {
   switch (name) {
     case 'DATABASE_URL':

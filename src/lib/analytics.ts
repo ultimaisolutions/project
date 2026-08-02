@@ -7,11 +7,13 @@ import { getServerEnv } from './env';
 import { fetchGoogleSheet } from './sheets';
 import { noTimings, type Timings } from './timing';
 
+/** Reads, trims, and bounds a repeated query-string filter. */
 const many = (query: URLSearchParams, key: string) => query.getAll(key)
   .map((value) => value.trim())
   .filter((value) => value.length > 0 && value.length <= 100)
   .slice(0, 50);
 
+/** Accepts date-shaped query values and ignores absent or malformed values. */
 const date = (value: string | null) => value && /^\d{4}-\d{2}-\d{2}$/.test(value)
   ? value
   : undefined;
@@ -24,6 +26,10 @@ type ConnectionCacheIdentity = {
   lastSyncAt?: unknown;
 };
 
+/**
+ * Builds a per-user cache key tied to the credentials and worksheet identity.
+ * Sync timestamps are intentionally excluded because they do not change the source data.
+ */
 export function connectionCacheKey(
   userId: string,
   connection: ConnectionCacheIdentity,
@@ -39,6 +45,7 @@ export function connectionCacheKey(
   return `${userId}:${revision}`;
 }
 
+/** Converts dashboard URL parameters into normalized, bounded filters. */
 export function filtersFromSearchParams(query: URLSearchParams): DashboardFilters {
   return {
     from: date(query.get('from')),
@@ -51,6 +58,10 @@ export function filtersFromSearchParams(query: URLSearchParams): DashboardFilter
   };
 }
 
+/**
+ * Loads the user's configured worksheet, reusing cached parsed rows unless a refresh
+ * is requested, and records successful upstream synchronizations.
+ */
 export async function loadSheetForUser(
   userId: string,
   refresh = false,
@@ -104,6 +115,7 @@ export async function loadSheetForUser(
   };
 }
 
+/** Loads the user's worksheet and aggregates it using filters from the request URL. */
 export async function loadDashboardForUser(
   userId: string,
   query: URLSearchParams,

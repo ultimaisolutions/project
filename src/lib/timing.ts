@@ -1,3 +1,4 @@
+/** A named server phase and its elapsed duration in milliseconds. */
 export type Mark = { name: string; duration: number };
 
 export type Timings = {

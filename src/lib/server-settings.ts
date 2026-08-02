@@ -1,5 +1,6 @@
 import { getServerEnv } from './env';
 
+/** Returns complete environment-provided sheet defaults, or `null` if any are missing. */
 export function configuredSheetDefaults() {
   const apiKey = getServerEnv('GOOGLE_SHEETS_API');
   const spreadsheetId = getServerEnv('SHEET_ID');

@@ -12,6 +12,7 @@ const kpiLabels: Record<string, string> = {
   roi: 'החזר על ההשקעה',
 };
 
+/** Combines grounded analytics and generated insights into the management report DTO. */
 export function buildManagementReport(
   snapshot: AnalyticsSnapshot,
   insights: InsightsOutput,
@@ -50,11 +51,13 @@ export function buildManagementReport(
 
 export type ManagementReport = ReturnType<typeof buildManagementReport>;
 
+/** Escapes a value as one RFC 4180-style CSV cell. */
 const csvCell = (value: unknown) => {
   const text = value == null ? '' : String(value);
   return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 };
 
+/** Serializes a management report as UTF-8 BOM-prefixed CSV with CRLF rows. */
 export function reportToCsv(report: ManagementReport) {
   const rows: unknown[][] = [
     ['דוח ניהולי STSICONIC'],

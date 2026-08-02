@@ -1,11 +1,16 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
+/** Decodes and validates the required 32-byte AES key. */
 function keyFrom(value: string) {
   const key = Buffer.from(value, 'base64');
   if (key.length !== 32) throw new Error('INVALID_ENCRYPTION_KEY');
   return key;
 }
 
+/**
+ * Encrypts a secret with AES-256-GCM, binding the ciphertext to the owning user ID.
+ * The returned payload contains the IV, authentication tag, and ciphertext.
+ */
 export function encryptSecret(secret: string, userId: string, encodedKey: string) {
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', keyFrom(encodedKey), iv);
@@ -14,6 +19,7 @@ export function encryptSecret(secret: string, userId: string, encodedKey: string
   return [iv, cipher.getAuthTag(), encrypted].map((value) => value.toString('base64url')).join('.');
 }
 
+/** Decrypts and authenticates a user-bound payload created by {@link encryptSecret}. */
 export function decryptSecret(payload: string, userId: string, encodedKey: string) {
   const [iv, tag, encrypted] = payload.split('.').map((value) => Buffer.from(value!, 'base64url'));
   const decipher = createDecipheriv('aes-256-gcm', keyFrom(encodedKey), iv!);
@@ -23,6 +29,7 @@ export function decryptSecret(payload: string, userId: string, encodedKey: strin
 }
 
 type StoredSettings = { apiKeyEncrypted: string; apiKeyLastFour: string; spreadsheetId: string; worksheetName: string; status: string; lastTestedAt?: Date | string | null; lastSyncAt?: Date | string | null; lastErrorCode?: string | null };
+/** Converts stored connection settings into the secret-free DTO exposed to clients. */
 export function publicSettings(settings: StoredSettings | null) {
   if (!settings) return { apiKeyConfigured: false, maskedApiKey: null, spreadsheetId: '', worksheetName: '', status: 'DISCONNECTED', lastTestedAt: null, lastSyncAt: null, lastErrorCode: null };
   return { apiKeyConfigured: true, maskedApiKey: `•••• •••• •••• ${settings.apiKeyLastFour}`, spreadsheetId: settings.spreadsheetId, worksheetName: settings.worksheetName, status: settings.status, lastTestedAt: settings.lastTestedAt ?? null, lastSyncAt: settings.lastSyncAt ?? null, lastErrorCode: settings.lastErrorCode ?? null };

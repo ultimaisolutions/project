@@ -51,6 +51,7 @@ const chartMeta = [
   ['funnel', 'משפך מכירות', 'funnel', 'number'],
 ] as const;
 
+/** Formats report metrics according to their configured display type. */
 function format(value: number | null, type: string) {
   if (value == null) return '—';
   if (type === 'currency') return currency.format(value);
@@ -58,6 +59,7 @@ function format(value: number | null, type: string) {
   return number.format(value);
 }
 
+/** Generates, restores, renders, and exports the filter-aware management report. */
 export default function ReportBuilder() {
   const [result, setResult] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -72,6 +74,7 @@ export default function ReportBuilder() {
     }
   }, []);
 
+  /** Requests a fresh report and caches it for the current browser-tab filter state. */
   const generate = async () => {
     setLoading(true);
     setError(null);
@@ -95,6 +98,7 @@ export default function ReportBuilder() {
     }
   };
 
+  /** Creates and downloads a temporary CSV object URL for the current report. */
   const downloadCsv = () => {
     if (!result) return;
     const blob = new Blob([reportToCsv(result.report)], {

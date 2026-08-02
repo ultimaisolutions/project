@@ -48,10 +48,12 @@ const percent = new Intl.NumberFormat('he-IL', {
   maximumFractionDigits: 1,
 });
 
+/** Narrows an unknown tool result to a non-null record. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+/** Formats a tool value using the metric's number, currency, or percentage convention. */
 function formatValue(metric: string, value: unknown) {
   if (typeof value !== 'number') return value == null ? 'אין נתון' : String(value);
   if (metric === 'revenue' || metric === 'spend' || metric === 'costPerLead' || metric === 'currency') {
@@ -61,6 +63,7 @@ function formatValue(metric: string, value: unknown) {
   return number.format(value);
 }
 
+/** Renders the structured tool evidence that supports an assistant answer. */
 function EvidencePanel({ evidence }: { evidence: ToolEvidence[] }) {
   if (evidence.length === 0) return null;
   return (
@@ -144,12 +147,14 @@ function EvidencePanel({ evidence }: { evidence: ToolEvidence[] }) {
   );
 }
 
+/** Provides a conversational analytics agent with grounded evidence and generated images. */
 export default function QuestionsAgent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** Sends a bounded conversation and the active filters to the questions API. */
   const ask = async (question: string) => {
     const clean = question.trim();
     if (!clean || loading) return;
@@ -188,11 +193,13 @@ export default function QuestionsAgent() {
     }
   };
 
+  /** Submits the current composer text without navigating away. */
   const submit = (event: SyntheticEvent<HTMLFormElement, SubmitEvent>) => {
     event.preventDefault();
     void ask(input);
   };
 
+  /** Sends on Enter while preserving Shift+Enter for multiline questions. */
   const onKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();

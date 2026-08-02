@@ -32,12 +32,14 @@ const errors: Record<string, string> = {
   TIMEOUT: 'יצירת התמונה נמשכה זמן רב מדי. נסו שוב.',
 };
 
+/** Provides data-grounded image generation and download controls. */
 export default function ImageStudio() {
   const [type, setType] = useState<ImageType>('cover');
   const [result, setResult] = useState<ImageResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** Generates the selected image type using analytics from the current URL filters. */
   const generate = async () => {
     setLoading(true);
     setError(null);

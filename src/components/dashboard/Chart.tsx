@@ -7,6 +7,7 @@ echarts.use([BarChart,FunnelChart,LineChart,PieChart,AriaComponent,GridComponent
 
 type Datum={name:string;value:number;actualSpend?:number};
 type ValueType = 'currency' | 'number' | 'percent';
+/** Renders an accessible ECharts visualization and owns its resize/disposal lifecycle. */
 export default function Chart({kind,data,label,valueType='number'}:{kind:'line'|'bar'|'pie'|'funnel';data:Datum[];label:string;valueType?:ValueType}){
   const ref=useRef<HTMLDivElement>(null);
   useEffect(()=>{if(!ref.current)return;const chart=echarts.init(ref.current);const names=data.map(d=>d.name),values=data.map(d=>d.value);const valueFormatter=(value:number)=>valueType==='currency'?new Intl.NumberFormat('he-IL',{style:'currency',currency:'ILS',maximumFractionDigits:0}).format(value):valueType==='percent'?new Intl.NumberFormat('he-IL',{style:'percent',maximumFractionDigits:1}).format(value):new Intl.NumberFormat('he-IL',{maximumFractionDigits:0}).format(value);const common={aria:{enabled:true,decal:{show:true},description:{enabled:true,prefix:`תרשים ${label}.`}},backgroundColor:'transparent',textStyle:{fontFamily:'Heebo',color:'#A9B9C9'},color:['#22D3EE','#2DD4BF','#60A5FA','#A78BFA','#FBBF24','#FB7185','#64748B'],tooltip:{trigger:'item',valueFormatter},animationDuration:450};
