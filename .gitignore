@@ -40,3 +40,6 @@ skills-lock.json
 .superdesign/tmp/
 .superdesign
 .env*
+
+# Local development files
+trace.gz

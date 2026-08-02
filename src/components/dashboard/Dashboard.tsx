@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Chart from './Chart';
+import { usePollingRefresh } from './usePollingRefresh';
 import './dashboard.css';
+
+const POLL_INTERVAL_MS = 5 * 60_000; // Polls every 5 minutes, change to 10_000 for testing purposes;
 
 type Kpi = { current: number | null; previous: number | null; delta: number | null };
 type Leader = { name: string; revenue: number } | null;
@@ -218,6 +221,8 @@ export default function Dashboard() {
       abort.current?.abort();
     };
   }, [load]);
+
+  usePollingRefresh(() => { void load(); }, POLL_INTERVAL_MS);
 
   const params = useMemo(() => new URLSearchParams(search), [search]);
   const active = useMemo(

@@ -44,8 +44,8 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@clerk/testing": "latest",
     "@astrojs/check": "latest",
+    "@clerk/testing": "latest",
     "@playwright/test": "latest",
     "@prisma-next/adapter-postgres": "0.16.0",
     "@prisma-next/cli": "0.16.0",
@@ -56,8 +56,9 @@
     "@prisma-next/vite-plugin-contract-emit": "0.16.0",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
-    "@types/node": "latest",
     "@types/bun": "latest",
+    "@types/jsdom": "^28.0.3",
+    "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "jsdom": "latest",
