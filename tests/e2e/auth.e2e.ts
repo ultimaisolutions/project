@@ -16,8 +16,10 @@ test('sign-in page has no horizontal overflow', async ({ page, context }) => {
   expect(overflows).toBe(false);
 });
 
-test('Clerk SSO callback is handled by the sign-in route', async ({ page }) => {
-  const response = await page.goto('/sign-in/sso-callback?sign_in_force_redirect_url=http%3A%2F%2F127.0.0.1%3A4321%2Fdashboard', { waitUntil: 'domcontentloaded' });
+test('Clerk SSO callback is handled by the sign-in route', async ({ page }, testInfo) => {
+  const dashboardUrl = new URL('/dashboard', testInfo.project.use.baseURL).toString();
+  const callbackUrl = `/sign-in/sso-callback?sign_in_force_redirect_url=${encodeURIComponent(dashboardUrl)}`;
+  const response = await page.goto(callbackUrl, { waitUntil: 'domcontentloaded' });
   expect(response?.status()).not.toBe(404);
   await expect(page.getByRole('heading', { name: 'טוב שחזרת' })).toBeVisible();
 });

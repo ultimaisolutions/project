@@ -18,6 +18,42 @@ export function resolveServerEnv(
   return viteValue?.trim() || processValue?.trim() || undefined;
 }
 
+function isLocalHostname(hostname: string) {
+  return hostname === 'localhost'
+    || hostname === '127.0.0.1'
+    || hostname === '[::1]';
+}
+
+/** Keeps local auth local while pinning hosted auth to the configured site origin. */
+export function resolveAuthOrigin(requestUrl: URL, configuredSiteUrl?: string) {
+  if (isLocalHostname(requestUrl.hostname)) return requestUrl.origin;
+
+  if (configuredSiteUrl) {
+    try {
+      const configuredUrl = new URL(configuredSiteUrl);
+      if (
+        (configuredUrl.protocol === 'https:' || configuredUrl.protocol === 'http:')
+        && !isLocalHostname(configuredUrl.hostname)
+      ) {
+        return configuredUrl.origin;
+      }
+    } catch {
+      // Fall through to the request origin for malformed optional configuration.
+    }
+  }
+
+  return requestUrl.origin;
+}
+
+/** Resolves the canonical hosted site URL, including Vercel's system fallback. */
+export function getConfiguredSiteUrl() {
+  const siteUrl = getServerEnv('PUBLIC_SITE_URL');
+  if (siteUrl) return siteUrl;
+
+  const vercelProjectUrl = getServerEnv('VERCEL_PROJECT_PRODUCTION_URL');
+  return vercelProjectUrl ? `https://${vercelProjectUrl}` : undefined;
+}
+
 /** Reads an allowed server-only environment variable from Vite or the Node process. */
 export function getServerEnv(name: ServerEnvName) {
   switch (name) {

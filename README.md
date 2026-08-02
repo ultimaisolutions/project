@@ -97,12 +97,14 @@ Clerk should enable Google and/or email-password authentication, self-service si
 | `GOOGLE_SHEETS_API` | Shared server-only Google Sheets API key used automatically for users without an override |
 | `SHEET_ID` | Shared native Google Sheet ID used automatically for users without an override |
 | `SHEET_NAME` | Shared worksheet name, normally `נתונים` |
-| `PUBLIC_SITE_URL` | OpenRouter application attribution URL |
+| `PUBLIC_SITE_URL` | Canonical hosted application URL used for auth redirects and OpenRouter attribution |
 | `CLERK_SIGN_IN_URL` | Clerk sign-in route (`/sign-in`) |
 | `CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | Post-sign-in route (`/dashboard`) |
 | `CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | Post-sign-up route (`/dashboard`) |
 
 The three shared Sheet variables are all-or-nothing: when the complete set is present, a newly authenticated user can open the dashboard immediately without visiting data settings. A saved per-user override takes precedence; an explicit disconnect suppresses the shared fallback until the user reconnects or restores the system default.
+
+Set `PUBLIC_SITE_URL` to the canonical HTTPS deployment URL in hosted environments. Local requests deliberately keep their localhost origin, while hosted Clerk callbacks use the canonical URL and reject a mistakenly configured localhost origin.
 
 Generate the encryption value with `openssl rand -base64 32`. Never commit `.env.local` or provider/database credentials.
 
