@@ -11,18 +11,18 @@ The Parasail completion ignored the strict response schema, used invalid evidenc
 
 ## Decision
 
-Use CoreWeave exclusively for grounded insights and management-report generation:
+Use an explicit provider allowlist for grounded insights and management-report generation, with CoreWeave as the verified primary:
 
 - Keep `deepseek/deepseek-v4-flash`.
 - Keep `stream: true` and the existing private chunk accumulator.
 - Keep strict JSON Schema output and `requireParameters: true`.
-- Set `provider.only` to `['CoreWeave']`.
+- Set `provider.order` to `['CoreWeave', 'DeepInfra', 'StreamLake', 'Baidu']`.
 - Set `provider.allowFallbacks` to `false`.
 - Remove throughput sorting from these structured requests.
 - Set the shared insights/report completion budget to `4_096` tokens.
 - Enforce a 120-second deadline across the complete provider stream, not only request establishment.
 
-CoreWeave failure or unavailability must fail closed with the existing sanitized error behavior. The request must not silently fall back to an unverified provider.
+CoreWeave failure or unavailability may advance only through DeepInfra, StreamLake, and Baidu in that order. Exhausting the allowlist must fail closed with the existing sanitized error behavior; the request must never silently route to a provider outside the list.
 
 ## Cancellation and Errors
 
@@ -37,7 +37,7 @@ No prompts, evidence, Sheet data, provider messages, or user identity are added 
 Tests must be written first and prove:
 
 - Both insight and report requests send `maxTokens: 4_096`.
-- Structured requests allow only CoreWeave, disable fallbacks, retain `requireParameters: true`, and contain no throughput sort.
+- Structured requests emit the exact approved provider order, disable routing outside that list, retain `requireParameters: true`, and contain no throughput sort.
 - A provider stream that remains open beyond the 120-second deadline is aborted even after it has started producing chunks.
 - Caller cancellation, strict finish handling, schema validation, retry policy, NDJSON progress, and JSON fallback continue to work.
 
@@ -54,4 +54,4 @@ The localhost smoke test is accepted only when the OpenRouter generation record 
 
 ## Scope Boundary
 
-This change does not modify the prompt, evidence catalog, output schema, report construction, NDJSON event contract, loading UI, or deployment configuration. Additional fallback providers require their own production-shaped schema smoke test before being added to an allowlist.
+This change does not modify the prompt, evidence catalog, output schema, report construction, NDJSON event contract, loading UI, or deployment configuration. CoreWeave is production-shaped smoke-tested; fallback activation remains observable through the existing sanitized provider diagnostics and OpenRouter generation records.

@@ -182,7 +182,7 @@ export function buildStructuredChatRequest<T>({
       temperature,
       provider: {
         requireParameters: true,
-        only: ['CoreWeave'],
+        order: ['CoreWeave', 'DeepInfra', 'StreamLake', 'Baidu'],
         allowFallbacks: false,
       },
       reasoning: {

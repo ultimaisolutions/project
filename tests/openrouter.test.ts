@@ -267,7 +267,7 @@ describe('OpenRouter structured output adapter', () => {
     expect(JSON.stringify(records)).not.toContain('secret');
   });
 
-  test('streams the bounded structured-output budget through CoreWeave only', () => {
+  test('streams the bounded structured-output budget through the approved provider order', () => {
     const request = buildStructuredChatRequest({
       messages: [{ role: 'user', content: 'Return JSON.' }],
       schema,
@@ -282,7 +282,7 @@ describe('OpenRouter structured output adapter', () => {
       maxTokens: 4_096,
       provider: {
         requireParameters: true,
-        only: ['CoreWeave'],
+        order: ['CoreWeave', 'DeepInfra', 'StreamLake', 'Baidu'],
         allowFallbacks: false,
       },
       reasoning: {
@@ -296,6 +296,7 @@ describe('OpenRouter structured output adapter', () => {
         },
       },
     });
+    expect(request.chatRequest.provider).not.toHaveProperty('only');
     expect(request.chatRequest.provider).not.toHaveProperty('sort');
     expect('maxCompletionTokens' in request.chatRequest).toBe(false);
   });

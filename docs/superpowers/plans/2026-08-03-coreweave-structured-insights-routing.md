@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make grounded insights and management reports reliably complete by routing only to verified CoreWeave, capping output at 4,096 tokens, and enforcing a 120-second deadline across the complete provider stream.
+**Goal:** Make grounded insights and management reports reliably complete by prioritizing verified CoreWeave with an explicit three-provider fallback order, capping output at 4,096 tokens, and enforcing a 120-second deadline across the complete provider stream.
 
 **Architecture:** Keep the existing strict-schema streamed adapter and client progress transport. Change only the shared structured-request routing/budget and compose the caller signal with an internal deadline signal inside `generateStructuredObject`, mapping internal deadline expiry to the existing sanitized upstream error.
 
@@ -12,7 +12,7 @@
 
 - Keep `deepseek/deepseek-v4-flash`, `stream: true`, strict JSON Schema, and `requireParameters: true`.
 - Both insights and reports use one shared `INSIGHTS_MAX_TOKENS = 4_096`.
-- Allow only CoreWeave and disable provider fallbacks; do not retain throughput sorting.
+- Route through CoreWeave, DeepInfra, StreamLake, and Baidu in that order; disable routing outside the list and do not retain throughput sorting.
 - Preserve caller cancellation and add a 120-second total-stream deadline.
 - Keep request bodies, DTOs, prompt, evidence/schema validation, retry rules, NDJSON events, UI, persistence, and exports unchanged.
 - Never log or return prompts, evidence, Sheet data, provider messages, credentials, or user identity.
@@ -28,7 +28,7 @@
 
 **Interfaces:**
 - Consumes: `generateStructuredObject(options, dependencies)` and `buildStructuredChatRequest(options)`.
-- Produces: the same validated return type and progress/diagnostic callbacks; outbound provider preferences become CoreWeave-only and generation uses a composed deadline signal.
+- Produces: the same validated return type and progress/diagnostic callbacks; outbound provider preferences use the approved ordered allowlist and generation uses a composed deadline signal.
 
 - [ ] **Step 1: Write failing routing and budget tests**
 
@@ -37,7 +37,7 @@ Update the high-level insight/report request test to expect `[4_096, 4_096]`. Up
 ```ts
 provider: {
   requireParameters: true,
-  only: ['CoreWeave'],
+  order: ['CoreWeave', 'DeepInfra', 'StreamLake', 'Baidu'],
   allowFallbacks: false,
 }
 ```
@@ -50,11 +50,11 @@ Run:
 bun test tests/openrouter.test.ts -t 'streams the full structured-output budget|uses the shared token budget'
 ```
 
-Expected: fail because production still sends 20,000 tokens and `sort: 'throughput'` without a CoreWeave allowlist.
+Expected: fail because production still sends 20,000 tokens and `sort: 'throughput'` without the approved provider order.
 
 - [ ] **Step 3: Implement routing and budget**
 
-Set `INSIGHTS_MAX_TOKENS` to `4_096`. Replace throughput sorting in `buildStructuredChatRequest` with `only: ['CoreWeave']` and `allowFallbacks: false`, retaining `requireParameters: true`.
+Set `INSIGHTS_MAX_TOKENS` to `4_096`. Replace throughput sorting in `buildStructuredChatRequest` with `order: ['CoreWeave', 'DeepInfra', 'StreamLake', 'Baidu']` and `allowFallbacks: false`, retaining `requireParameters: true`.
 
 - [ ] **Step 4: Run routing tests and verify GREEN**
 
