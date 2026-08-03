@@ -220,10 +220,9 @@ describe('OpenRouter structured output adapter', () => {
     expect(result).toEqual({ ok: true });
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({ xOpenRouterMetadata: 'enabled' });
-    expect(requestOptions[0]).toMatchObject({
-      signal: controller.signal,
-      retries: { strategy: 'none' },
-    });
+    expect(requestOptions[0]).toMatchObject({ retries: { strategy: 'none' } });
+    expect((requestOptions[0] as { signal?: AbortSignal }).signal)
+      .toBeInstanceOf(AbortSignal);
     expect(records).toEqual([{
       route: 'insights',
       model: 'provider/model-version',
@@ -268,22 +267,23 @@ describe('OpenRouter structured output adapter', () => {
     expect(JSON.stringify(records)).not.toContain('secret');
   });
 
-  test('streams the full structured-output budget with strict throughput routing', () => {
+  test('streams the bounded structured-output budget through CoreWeave only', () => {
     const request = buildStructuredChatRequest({
       messages: [{ role: 'user', content: 'Return JSON.' }],
       schema,
       schemaName: 'health',
-      maxTokens: 20_000,
+      maxTokens: 4_096,
       temperature: 0,
     });
 
     expect(request.chatRequest).toMatchObject({
       model: 'deepseek/deepseek-v4-flash',
       stream: true,
-      maxTokens: 20_000,
+      maxTokens: 4_096,
       provider: {
         requireParameters: true,
-        sort: 'throughput',
+        only: ['CoreWeave'],
+        allowFallbacks: false,
       },
       reasoning: {
         effort: 'none',
@@ -296,6 +296,7 @@ describe('OpenRouter structured output adapter', () => {
         },
       },
     });
+    expect(request.chatRequest.provider).not.toHaveProperty('sort');
     expect('maxCompletionTokens' in request.chatRequest).toBe(false);
   });
 
@@ -355,7 +356,72 @@ describe('OpenRouter structured output adapter', () => {
     }
 
     expect(requests.map((request) => request.chatRequest?.maxTokens))
-      .toEqual([20_000, 20_000]);
+      .toEqual([4_096, 4_096]);
+  });
+
+  test('aborts an active provider stream at the total generation deadline', async () => {
+    const deadlineController = new AbortController();
+    let receivedTimeoutMs: number | undefined;
+    let providerSignal: AbortSignal | undefined;
+    let streamStartedResolve: (() => void) | undefined;
+    const streamStarted = new Promise<void>((resolve) => {
+      streamStartedResolve = resolve;
+    });
+
+    async function* chunks(signal: AbortSignal) {
+      yield {
+        choices: [{ delta: { content: '{"ok":' }, finishReason: null }],
+      };
+      streamStartedResolve?.();
+      await new Promise<void>((_resolve, reject) => {
+        const rejectForAbort = () => reject(signal.reason);
+        if (signal.aborted) {
+          rejectForAbort();
+          return;
+        }
+        signal.addEventListener('abort', rejectForAbort, { once: true });
+      });
+    }
+
+    const generation = generateStructuredObject({
+      messages: [{ role: 'user', content: 'Return JSON.' }],
+      schema,
+      schemaName: 'health',
+      maxTokens: 4_096,
+      temperature: 0,
+    }, {
+      createTimeoutSignal: (timeoutMs) => {
+        receivedTimeoutMs = timeoutMs;
+        return deadlineController.signal;
+      },
+      send: async (_request, requestOptions) => {
+        providerSignal = requestOptions.signal;
+        if (!providerSignal) {
+          streamStartedResolve?.();
+          throw new Error('deadline signal was not forwarded');
+        }
+        return chunks(providerSignal);
+      },
+      now: () => 100,
+      log: () => {},
+    });
+
+    await streamStarted;
+    deadlineController.abort(new DOMException('deadline', 'TimeoutError'));
+
+    let error: unknown;
+    try {
+      await generation;
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(receivedTimeoutMs).toBe(120_000);
+    expect(error).toMatchObject({
+      code: 'UPSTREAM_ERROR',
+      message: 'UPSTREAM_ERROR',
+    });
+    expect(providerSignal?.aborted).toBe(true);
   });
 
   test('parses and validates only textual JSON objects', () => {

@@ -37,7 +37,7 @@ Update the high-level insight/report request test to expect `[4_096, 4_096]`. Up
 ```ts
 provider: {
   requireParameters: true,
-  only: ['coreweave'],
+  only: ['CoreWeave'],
   allowFallbacks: false,
 }
 ```
@@ -54,7 +54,7 @@ Expected: fail because production still sends 20,000 tokens and `sort: 'throughp
 
 - [ ] **Step 3: Implement routing and budget**
 
-Set `INSIGHTS_MAX_TOKENS` to `4_096`. Replace throughput sorting in `buildStructuredChatRequest` with `only: ['coreweave']` and `allowFallbacks: false`, retaining `requireParameters: true`.
+Set `INSIGHTS_MAX_TOKENS` to `4_096`. Replace throughput sorting in `buildStructuredChatRequest` with `only: ['CoreWeave']` and `allowFallbacks: false`, retaining `requireParameters: true`.
 
 - [ ] **Step 4: Run routing tests and verify GREEN**
 

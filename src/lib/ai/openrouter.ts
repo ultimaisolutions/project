@@ -5,7 +5,7 @@ import { getServerEnv } from '../env';
 import { AI_MODEL } from './model';
 
 const DEFAULT_TIMEOUT_MS = 120_000;
-export const INSIGHTS_MAX_TOKENS = 20_000;
+export const INSIGHTS_MAX_TOKENS = 4_096;
 
 type StructuredChatOptions<T> = {
   messages: ChatMessages[];
@@ -81,6 +81,7 @@ export type StructuredOutputDependencies = {
     request: ReturnType<typeof buildStructuredChatRequest>,
     options: ReturnType<typeof structuredOutputRequestOptions>,
   ) => Promise<AsyncIterable<StructuredChatChunk>>;
+  createTimeoutSignal?: (timeoutMs: number) => AbortSignal;
   now?: () => number;
   log?: (diagnostic: StructuredAttemptDiagnostic) => void;
 };
@@ -181,7 +182,8 @@ export function buildStructuredChatRequest<T>({
       temperature,
       provider: {
         requireParameters: true,
-        sort: 'throughput' as const,
+        only: ['CoreWeave'],
+        allowFallbacks: false,
       },
       reasoning: {
         effort: 'none' as const,
@@ -318,6 +320,12 @@ export async function generateStructuredObject<T>(
 ) {
   const now = dependencies.now ?? Date.now;
   const log = dependencies.log ?? ((diagnostic) => console.info(diagnostic));
+  const createTimeoutSignal = dependencies.createTimeoutSignal
+    ?? ((timeoutMs: number) => AbortSignal.timeout(timeoutMs));
+  const timeoutSignal = createTimeoutSignal(DEFAULT_TIMEOUT_MS);
+  const generationSignal = options.signal
+    ? AbortSignal.any([options.signal, timeoutSignal])
+    : timeoutSignal;
   const startedAt = now();
   let streamStarted = false;
   let streamDiagnostic: StructuredStreamDiagnostic = {};
@@ -327,7 +335,7 @@ export async function generateStructuredObject<T>(
       ...buildStructuredChatRequest(options),
       xOpenRouterMetadata: 'enabled' as const,
     };
-    const requestOptions = structuredOutputRequestOptions(options.signal);
+    const requestOptions = structuredOutputRequestOptions(generationSignal);
     const chunks = dependencies.send
       ? await dependencies.send(request, requestOptions)
       : await openRouterClient().chat.send(request, requestOptions);
@@ -336,18 +344,20 @@ export async function generateStructuredObject<T>(
       throw aiError('AI_INVALID_RESPONSE');
     }
     return await consumeStructuredChatStream(chunks, options.schema, {
-      signal: options.signal,
+      signal: generationSignal,
       onProgress: options.onProgress,
       onDiagnostic: (diagnostic) => { streamDiagnostic = diagnostic; },
     });
   } catch (error) {
     if (!streamStarted) {
       if (options.signal?.aborted) options.signal.throwIfAborted();
+      if (timeoutSignal.aborted) throw aiError('UPSTREAM_ERROR');
       if (error instanceof DOMException && error.name === 'AbortError') throw error;
       if (errorCode(error) === 'AI_NOT_CONFIGURED') throw error;
       throw aiError('UPSTREAM_ERROR');
     }
     if (options.signal?.aborted) options.signal.throwIfAborted();
+    if (timeoutSignal.aborted) throw aiError('UPSTREAM_ERROR');
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
     const knownCode = knownStructuredOutputErrorCode(error);
     throw aiError(knownCode ?? 'UPSTREAM_ERROR');

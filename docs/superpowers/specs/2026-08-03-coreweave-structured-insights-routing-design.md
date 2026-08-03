@@ -16,7 +16,7 @@ Use CoreWeave exclusively for grounded insights and management-report generation
 - Keep `deepseek/deepseek-v4-flash`.
 - Keep `stream: true` and the existing private chunk accumulator.
 - Keep strict JSON Schema output and `requireParameters: true`.
-- Set `provider.only` to `['coreweave']`.
+- Set `provider.only` to `['CoreWeave']`.
 - Set `provider.allowFallbacks` to `false`.
 - Remove throughput sorting from these structured requests.
 - Set the shared insights/report completion budget to `4_096` tokens.
