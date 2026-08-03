@@ -19,6 +19,7 @@ import {
   type AnalyticsSnapshot,
   type DimensionMetrics,
 } from '../src/lib/ai/grounding';
+import { generateGroundedInsights } from '../src/lib/ai/insights';
 
 describe('OpenRouter structured output adapter', () => {
   const schema = z.object({ ok: z.boolean() });
@@ -137,6 +138,38 @@ describe('OpenRouter structured output adapter', () => {
         status: 500,
       },
     });
+  });
+
+  test('sanitizes provider failures thrown by the async iterator', async () => {
+    let error: unknown;
+    async function* chunks() {
+      yield {
+        choices: [{ delta: { content: '{"ok":' }, finishReason: null }],
+      };
+      throw new Error('secret transport detail');
+    }
+
+    try {
+      await generateStructuredObject({
+        messages: [{ role: 'user', content: 'Return JSON.' }],
+        schema,
+        schemaName: 'health',
+        maxTokens: 8_192,
+        temperature: 0,
+      }, {
+        send: async () => chunks(),
+        now: () => 100,
+        log: () => {},
+      });
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toMatchObject({
+      code: 'UPSTREAM_ERROR',
+      message: 'UPSTREAM_ERROR',
+    });
+    expect(JSON.stringify(error)).not.toContain('secret transport detail');
   });
 
   test('forwards cancellation and logs one sanitized diagnostic per provider attempt', async () => {
@@ -266,6 +299,65 @@ describe('OpenRouter structured output adapter', () => {
     expect('maxCompletionTokens' in request.chatRequest).toBe(false);
   });
 
+  test('uses the shared token budget for insight and report generation requests', async () => {
+    const requests: Array<{ chatRequest?: { maxTokens?: number } }> = [];
+    const snapshot = {
+      period: { from: null, to: null },
+      rowCount: 1,
+      kpis: { revenue: { current: 100, previous: null, delta: null } },
+      leaders: { topCampaign: null, topChannel: null },
+      rankings: { campaigns: [], channels: [], salespeople: [], products: [] },
+      dimensions: { campaigns: [], channels: [], salespeople: [], products: [] },
+      channelLeads: [],
+      campaignConversion: [],
+      funnel: [],
+      daily: [],
+      monthly: [],
+    } satisfies AnalyticsSnapshot;
+    const output = {
+      summary: 'הביצועים מצביעים על מגמה חיובית.',
+      insights: Array.from({ length: 3 }, () => ({
+        title: 'תובנה מרכזית',
+        explanation: 'ההכנסות מציגות ביצועים חזקים.',
+        evidenceKeys: ['kpi.revenue.current'],
+      })),
+      trends: [{
+        title: 'מגמה מרכזית',
+        explanation: 'המגמה מצדיקה המשך מעקב.',
+        evidenceKeys: ['kpi.revenue.current'],
+      }],
+      anomalies: [],
+      exceptionalPerformers: [],
+      recommendations: ['להמשיך לעקוב אחר הביצועים.', 'לבחון את איכות הלידים.'],
+      investigate: ['לבדוק את מקורות השינוי.'],
+    };
+
+    for (const route of ['insights', 'report'] as const) {
+      async function* chunks() {
+        yield {
+          choices: [{
+            delta: { content: JSON.stringify(output) },
+            finishReason: 'stop',
+          }],
+        };
+      }
+      await generateGroundedInsights(snapshot, {
+        route,
+        providerDependencies: {
+          send: async (request: { chatRequest?: { maxTokens?: number } }) => {
+            requests.push(request);
+            return chunks();
+          },
+          now: () => 100,
+          log: () => {},
+        },
+      });
+    }
+
+    expect(requests.map((request) => request.chatRequest?.maxTokens))
+      .toEqual([8_192, 8_192]);
+  });
+
   test('parses and validates only textual JSON objects', () => {
     expect(parseStructuredChatContent('{"ok":true}', schema)).toEqual({ ok: true });
     expect(() => parseStructuredChatContent('{"ok":"yes"}', schema))
@@ -302,6 +394,27 @@ describe('OpenRouter structured output adapter', () => {
 
     expect(error).toMatchObject({ code: 'AI_TRUNCATED_RESPONSE' });
     expect(attempts).toBe(1);
+  });
+
+  test('retries one empty structured completion', async () => {
+    let attempts = 0;
+    const stages: string[] = [];
+    const result = await withStructuredOutputRetry(async () => {
+      attempts += 1;
+      async function* chunks() {
+        yield {
+          choices: [{
+            delta: { content: attempts === 1 ? '' : '{"ok":true}' },
+            finishReason: 'stop',
+          }],
+        };
+      }
+      return consumeStructuredChatStream(chunks(), schema);
+    }, { onProgress: (stage) => stages.push(stage) });
+
+    expect(result).toEqual({ ok: true });
+    expect(attempts).toBe(2);
+    expect(stages).toEqual(['retrying']);
   });
 
   test('reports one retry stage before retrying malformed schema output', async () => {

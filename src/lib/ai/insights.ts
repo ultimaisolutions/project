@@ -13,6 +13,7 @@ import {
   generateStructuredObject,
   INSIGHTS_MAX_TOKENS,
   type StructuredGenerationStage,
+  type StructuredOutputDependencies,
   withStructuredOutputRetry,
 } from './openrouter';
 
@@ -50,6 +51,7 @@ type GroundedInsightsGenerationOptions = {
   signal?: AbortSignal;
   onProgress?: (stage: StructuredGenerationStage) => void;
   route?: 'insights' | 'report';
+  providerDependencies?: StructuredOutputDependencies;
 };
 
 export async function generateGroundedInsights(
@@ -90,7 +92,9 @@ export async function generateGroundedInsights(
     onProgress: generationOptions.onProgress,
     route: generationOptions.route ?? 'insights',
     attempt,
-  }), { onProgress: generationOptions.onProgress });
+  }, generationOptions.providerDependencies), {
+    onProgress: generationOptions.onProgress,
+  });
 
   validateInsightEvidence(output, allowedKeys);
   validateInsightSemantics(output, catalog);

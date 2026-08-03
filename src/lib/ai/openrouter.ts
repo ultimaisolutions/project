@@ -68,7 +68,7 @@ type StructuredAttemptDiagnostic = StructuredStreamDiagnostic & {
   durationMs: number;
 };
 
-type StructuredOutputDependencies = {
+export type StructuredOutputDependencies = {
   send?: (
     request: ReturnType<typeof buildStructuredChatRequest>,
     options: ReturnType<typeof structuredOutputRequestOptions>,
@@ -103,7 +103,20 @@ function isAsyncIterable(value: unknown): value is AsyncIterable<StructuredChatC
 export function isRetryableStructuredOutputError(error: unknown) {
   const code = errorCode(error);
   return code?.startsWith('AI_SCHEMA_') === true
-    || code === 'AI_INVALID_JSON';
+    || code === 'AI_INVALID_JSON'
+    || code === 'AI_EMPTY_RESPONSE';
+}
+
+function knownStructuredOutputErrorCode(error: unknown) {
+  const code = errorCode(error);
+  if (isRetryableStructuredOutputError(error)
+    || code === 'AI_TRUNCATED_RESPONSE'
+    || code === 'AI_INVALID_RESPONSE'
+    || code === 'AI_NOT_CONFIGURED'
+    || code === 'UPSTREAM_ERROR') {
+    return code;
+  }
+  return undefined;
 }
 
 export async function withStructuredOutputRetry<T>(
@@ -308,7 +321,10 @@ export async function generateStructuredObject<T>(
       if (errorCode(error) === 'AI_NOT_CONFIGURED') throw error;
       throw aiError('UPSTREAM_ERROR');
     }
-    throw error;
+    if (options.signal?.aborted) options.signal.throwIfAborted();
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    const knownCode = knownStructuredOutputErrorCode(error);
+    throw aiError(knownCode ?? 'UPSTREAM_ERROR');
   } finally {
     log({
       route: options.route ?? 'structured-output',
