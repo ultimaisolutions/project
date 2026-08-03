@@ -179,7 +179,7 @@ describe('AI insights streaming UI', () => {
     expect(new Headers(requests[0]?.headers).get('accept')).toBe('application/x-ndjson');
 
     stream.event({ type: 'progress', stage: 'generating' });
-    await view.findByText('DeepSeek מנתח את הביצועים…');
+    await view.findByText('AI מנתח את הביצועים…');
     stream.event({ type: 'progress', stage: 'validating' });
     await view.findByText('מאמת את התובנות מול הנתונים…');
     stream.event({ type: 'result', data: insightsResult });
@@ -254,7 +254,7 @@ describe('management report streaming UI', () => {
     const stream = await waitForRequest(streams);
     expect(new Headers(requests[0]?.headers).get('accept')).toBe('application/x-ndjson');
     stream.event({ type: 'progress', stage: 'generating' });
-    await view.findByText('DeepSeek מנתח את הביצועים…');
+    await view.findByText('AI מנתח את הביצועים…');
     stream.event({ type: 'result', data: reportResult });
     stream.close();
 

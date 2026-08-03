@@ -11,7 +11,7 @@ const progressStages = new Set<AiProgressStage>([
 
 export const aiProgressLabels: Record<AiProgressStage, string> = {
   'loading-data': 'טוען ומסכם את הנתונים…',
-  generating: 'DeepSeek מנתח את הביצועים…',
+  generating: 'AI מנתח את הביצועים…',
   validating: 'מאמת את התובנות מול הנתונים…',
   retrying: 'מחדד את התוצאה…',
 };

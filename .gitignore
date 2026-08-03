@@ -43,3 +43,7 @@ skills-lock.json
 
 # Local development files
 trace.gz
+
+# Private interview preparation
+/docs/*[Ii]nterview*
+/docs/**/*[Ii]nterview*

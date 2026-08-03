@@ -185,7 +185,7 @@ test('AI insights exposes streamed busy state and remains usable without overflo
   await expect(skeleton).toHaveAttribute('aria-busy', 'true');
   const status = page.getByRole('status');
   await expect(status).toHaveAttribute('aria-live', 'polite');
-  await expect(status).toHaveText('DeepSeek מנתח את הביצועים…');
+  await expect(status).toHaveText('AI מנתח את הביצועים…');
   expect(await status.locator('.ai-progress-pulse').evaluate((element) => (
     getComputedStyle(element).animationName
   ))).toBe('none');
@@ -216,7 +216,7 @@ test('management report exposes its full streamed skeleton and remains usable wi
   await expect(skeleton.locator('.report-skeleton-ai')).toBeVisible();
   await expect(skeleton.locator('.report-skeleton-ai .skeleton-card-line').first()).toBeVisible();
   const status = page.getByRole('status');
-  await expect(status).toHaveText('DeepSeek מנתח את הביצועים…');
+  await expect(status).toHaveText('AI מנתח את הביצועים…');
   await expectNoHorizontalOverflow(page);
 
   await page.evaluate(() => (window as BrowserTestWindow).__finishAiTest?.());
