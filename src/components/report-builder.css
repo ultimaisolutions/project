@@ -47,8 +47,17 @@
 }
 
 .report-page {
+  min-width: 0;
   display: grid;
   gap: 16px;
+}
+
+.report-loading > *,
+.report-loading section,
+.report-loading .management-report,
+.report-loading .report-cover > div,
+.report-loading .report-insights > div {
+  min-width: 0;
 }
 
 .report-actions {
@@ -74,6 +83,7 @@
 }
 
 .management-report {
+  min-width: 0;
   padding: 32px;
 }
 
@@ -234,6 +244,95 @@
   font-weight: 700;
 }
 
+.skeleton-report-logo {
+  width: 52px;
+  height: 52px;
+}
+
+.skeleton-cover-kicker {
+  width: min(220px, 55%);
+  height: 10px;
+}
+
+.skeleton-cover-title {
+  width: min(380px, 82%);
+  height: 26px;
+  margin: 10px 0;
+}
+
+.skeleton-cover-meta {
+  width: min(250px, 64%);
+  height: 11px;
+}
+
+.skeleton-source-line {
+  width: 145px;
+  max-width: 100%;
+  height: 12px;
+  margin: 4px 0;
+}
+
+.skeleton-source-line.short {
+  width: 105px;
+}
+
+.skeleton-report-summary {
+  width: 88%;
+  height: 18px;
+  margin-top: 14px;
+}
+
+.skeleton-report-summary.short {
+  width: 62%;
+  margin-top: 9px;
+}
+
+.skeleton-report-heading {
+  width: 160px;
+  height: 18px;
+  margin: 28px 0 14px;
+}
+
+.report-skeleton-kpis > div {
+  min-height: 106px;
+}
+
+.skeleton-kpi-label {
+  width: 58%;
+  height: 10px;
+}
+
+.skeleton-kpi-value {
+  width: 76%;
+  height: 22px;
+  margin: 8px 0;
+}
+
+.skeleton-kpi-meta {
+  width: 48%;
+  height: 9px;
+}
+
+.skeleton-chart-title {
+  width: 42%;
+  height: 14px;
+}
+
+.skeleton-chart-canvas {
+  width: 100%;
+  height: 220px;
+  margin-top: 16px;
+}
+
+.skeleton-ai-item {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.report-skeleton-ai .skeleton-card-title {
+  width: 48%;
+}
+
 @media (max-width: 800px) {
   .report-welcome {
     min-height: 460px;
@@ -247,9 +346,11 @@
   .report-actions > div:last-child {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
+    min-width: 0;
   }
 
   .report-actions .btn {
+    min-width: 0;
     padding-inline: 8px;
     font-size: 11px;
   }
@@ -265,6 +366,10 @@
   .report-cover aside {
     grid-column: 1 / -1;
     text-align: right;
+  }
+
+  .report-skeleton-cover aside {
+    width: 100%;
   }
 
   .report-kpis,

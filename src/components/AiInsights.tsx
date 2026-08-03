@@ -1,4 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import {
+  fetchAiGeneration,
+  type AiProgressStage,
+} from '../lib/ai-stream-client';
+import AiGenerationProgress from './AiGenerationProgress';
 import './ai-insights.css';
 
 type Evidence = {
@@ -112,31 +117,91 @@ function InsightCards({
   );
 }
 
+/** Mirrors the final summary and insight-card geometry during first generation. */
+function InsightsSkeleton({ stage }: { stage: AiProgressStage }) {
+  return (
+    <div
+      className="insights-page insights-loading"
+      data-testid="insights-skeleton"
+      aria-busy="true"
+    >
+      <AiGenerationProgress stage={stage} />
+      <section className="card executive-summary insights-skeleton-summary" aria-hidden="true">
+        <div>
+          <div className="ai-skeleton-block skeleton-eyebrow" />
+          <div className="ai-skeleton-block skeleton-summary-line" />
+          <div className="ai-skeleton-block skeleton-summary-line short" />
+          <div className="ai-skeleton-block skeleton-meta-line" />
+        </div>
+      </section>
+      <section className="insight-section insights-skeleton-cards" aria-hidden="true">
+        <header>
+          <div className="ai-skeleton-block skeleton-section-title" />
+        </header>
+        <div className="insight-list">
+          {[0, 1, 2].map((index) => (
+            <article className="card insight-card" key={index}>
+              <div className="ai-skeleton-block skeleton-index" />
+              <div>
+                <div className="ai-skeleton-block skeleton-card-title" />
+                <div className="ai-skeleton-block skeleton-card-line" />
+                <div className="ai-skeleton-block skeleton-card-line short" />
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 /** Provides the interactive, filter-aware AI insights experience. */
 export default function AiInsights() {
   const [result, setResult] = useState<InsightsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stage, setStage] = useState<AiProgressStage>('loading-data');
+  const requestRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
+
+  useEffect(() => () => {
+    requestIdRef.current += 1;
+    requestRef.current?.abort();
+  }, []);
 
   /** Requests a fresh grounded analysis for the filters in the current URL. */
   const analyze = async () => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    requestRef.current = controller;
     setLoading(true);
     setError(null);
+    setStage('loading-data');
     try {
-      const response = await fetch('/api/ai/insights', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ query: window.location.search }),
+      const body = await fetchAiGeneration<InsightsResponse>('/api/ai/insights', {
+        query: window.location.search,
+      }, {
+        signal: controller.signal,
+        onProgress: (nextStage) => {
+          if (requestIdRef.current === requestId) setStage(nextStage);
+        },
       });
-      const body = await response.json() as InsightsResponse & { error?: string };
-      if (!response.ok) throw new Error(body.error ?? 'AI_ERROR');
-      setResult(body);
+      if (requestIdRef.current === requestId) setResult(body);
     } catch (caught) {
-      setError((caught as Error).message);
+      if (requestIdRef.current === requestId && !controller.signal.aborted) {
+        setError((caught as Error).message);
+      }
     } finally {
-      setLoading(false);
+      if (requestIdRef.current === requestId) {
+        requestRef.current = null;
+        setLoading(false);
+      }
     }
   };
+
+  if (!result && loading) return <InsightsSkeleton stage={stage} />;
 
   if (!result) {
     return (
@@ -149,8 +214,8 @@ export default function AiInsights() {
           מגמות, חריגות והמלצות עם המדדים שעליהם הן מבוססות.
         </p>
         {error && <div className="ai-error" role="alert">{errors[error] ?? 'הניתוח נכשל. נסו שוב.'}</div>}
-        <button className="btn primary analyze-button" disabled={loading} onClick={() => void analyze()}>
-          {loading ? <><span className="spinner" /> מנתח את הנתונים…</> : '✦ נתח את הנתונים'}
+        <button className="btn primary analyze-button" onClick={() => void analyze()}>
+          ✦ נתח את הנתונים
         </button>
         <small>מדדים מסוכמים נשלחים ל-OpenRouter לצורך הניתוח; אין גישה ישירה לגיליון ונתוני המקור אינם משתנים.</small>
       </section>
@@ -159,7 +224,11 @@ export default function AiInsights() {
 
   const evidence = new Map(result.insights.evidence.map((item) => [item.key, item]));
   return (
-    <div className="insights-page">
+    <div
+      className="insights-page"
+      data-testid="insights-page"
+      aria-busy={loading}
+    >
       <section className="card executive-summary">
         <div>
           <p className="eyebrow">סיכום ניהולי</p>
@@ -171,10 +240,11 @@ export default function AiInsights() {
             )}
           </p>
         </div>
-        <button className="btn" disabled={loading} onClick={() => void analyze()}>
+        <button className="btn" onClick={() => void analyze()}>
           {loading ? 'מנתח…' : 'ניתוח מחדש'}
         </button>
       </section>
+      {loading && <AiGenerationProgress stage={stage} />}
       {error && <div className="ai-error" role="alert">{errors[error] ?? 'הניתוח מחדש נכשל.'}</div>}
 
       <InsightCards

@@ -1,0 +1,78 @@
+.ai-generation-progress {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(34, 211, 238, .28);
+  border-radius: 12px;
+  background: rgba(34, 211, 238, .08);
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.ai-progress-pulse {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 rgba(34, 211, 238, .5);
+  animation: ai-progress-pulse 1.6s ease-out infinite;
+}
+
+.ai-skeleton-block {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.ai-skeleton-block::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgba(255, 255, 255, .06) 48%,
+    transparent 76%
+  );
+  content: '';
+  transform: translateX(110%);
+  animation: ai-skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
+.skeleton-card-title {
+  width: min(260px, 42%);
+  height: 16px;
+  margin: 4px 0 12px;
+}
+
+.skeleton-card-line {
+  width: 92%;
+  height: 12px;
+  margin-top: 8px;
+}
+
+.skeleton-card-line.short {
+  width: 64%;
+}
+
+@keyframes ai-progress-pulse {
+  70%, 100% {
+    box-shadow: 0 0 0 9px rgba(34, 211, 238, 0);
+  }
+}
+
+@keyframes ai-skeleton-shimmer {
+  to {
+    transform: translateX(-110%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-progress-pulse,
+  .ai-skeleton-block::after {
+    animation: none;
+  }
+}

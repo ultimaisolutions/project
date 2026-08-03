@@ -20,6 +20,7 @@ globals['window'] = dom.window;
 globals['document'] = dom.window.document;
 globals['navigator'] = dom.window.navigator;
 globals['location'] = dom.window.location;
+globals['sessionStorage'] = dom.window.sessionStorage;
 globals['HTMLElement'] = dom.window.HTMLElement;
 globals['Event'] = dom.window.Event;
 globals['IS_REACT_ACT_ENVIRONMENT'] = true;

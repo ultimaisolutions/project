@@ -1,10 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Evidence } from '../lib/ai/grounding';
+import {
+  fetchAiGeneration,
+  type AiProgressStage,
+} from '../lib/ai-stream-client';
 import {
   reportToCsv,
   type ManagementReport,
 } from '../lib/report';
 import Chart from './dashboard/Chart';
+import AiGenerationProgress from './AiGenerationProgress';
 import './report-builder.css';
 
 type ReportResponse = {
@@ -59,11 +64,86 @@ function format(value: number | null, type: string) {
   return number.format(value);
 }
 
+/** Mirrors the report cover, KPI, chart, and AI section layout while loading. */
+function ReportSkeleton({ stage }: { stage: AiProgressStage }) {
+  return (
+    <div
+      className="report-page report-loading"
+      data-testid="report-skeleton"
+      aria-busy="true"
+    >
+      <AiGenerationProgress stage={stage} />
+      <article className="management-report card" aria-hidden="true">
+        <header className="report-cover report-skeleton-cover">
+          <div className="ai-skeleton-block skeleton-report-logo" />
+          <div>
+            <div className="ai-skeleton-block skeleton-cover-kicker" />
+            <div className="ai-skeleton-block skeleton-cover-title" />
+            <div className="ai-skeleton-block skeleton-cover-meta" />
+          </div>
+          <aside>
+            <div className="ai-skeleton-block skeleton-source-line" />
+            <div className="ai-skeleton-block skeleton-source-line short" />
+          </aside>
+        </header>
+
+        <section className="report-summary">
+          <div className="ai-skeleton-block skeleton-cover-kicker" />
+          <div className="ai-skeleton-block skeleton-report-summary" />
+          <div className="ai-skeleton-block skeleton-report-summary short" />
+        </section>
+
+        <section>
+          <div className="ai-skeleton-block skeleton-report-heading" />
+          <div className="report-kpis report-skeleton-kpis">
+            {[0, 1, 2, 3].map((index) => (
+              <div key={index}>
+                <div className="ai-skeleton-block skeleton-kpi-label" />
+                <div className="ai-skeleton-block skeleton-kpi-value" />
+                <div className="ai-skeleton-block skeleton-kpi-meta" />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <div className="ai-skeleton-block skeleton-report-heading" />
+          <div className="report-charts report-skeleton-charts">
+            {[0, 1].map((index) => (
+              <div key={index}>
+                <div className="ai-skeleton-block skeleton-chart-title" />
+                <div className="ai-skeleton-block skeleton-chart-canvas" />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="report-insights report-skeleton-ai">
+          {[0, 1].map((column) => (
+            <div key={column}>
+              <div className="ai-skeleton-block skeleton-report-heading" />
+              {[0, 1].map((item) => (
+                <div className="skeleton-ai-item" key={item}>
+                  <div className="ai-skeleton-block skeleton-card-title" />
+                  <div className="ai-skeleton-block skeleton-card-line" />
+                </div>
+              ))}
+            </div>
+          ))}
+        </section>
+      </article>
+    </div>
+  );
+}
+
 /** Generates, restores, renders, and exports the filter-aware management report. */
 export default function ReportBuilder() {
   const [result, setResult] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stage, setStage] = useState<AiProgressStage>('loading-data');
+  const requestRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     try {
@@ -74,27 +154,46 @@ export default function ReportBuilder() {
     }
   }, []);
 
+  useEffect(() => () => {
+    requestIdRef.current += 1;
+    requestRef.current?.abort();
+  }, []);
+
   /** Requests a fresh report and caches it for the current browser-tab filter state. */
   const generate = async () => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    requestRef.current = controller;
     setLoading(true);
     setError(null);
+    setStage('loading-data');
     try {
-      const response = await fetch('/api/ai/report', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ query: window.location.search }),
+      const body = await fetchAiGeneration<ReportResponse>('/api/ai/report', {
+        query: window.location.search,
+      }, {
+        signal: controller.signal,
+        onProgress: (nextStage) => {
+          if (requestIdRef.current === requestId) setStage(nextStage);
+        },
       });
-      const body = await response.json() as ReportResponse & { error?: string };
-      if (!response.ok) throw new Error(body.error ?? 'REPORT_ERROR');
-      setResult(body);
-      sessionStorage.setItem(
-        `sts-report:${window.location.search}`,
-        JSON.stringify(body),
-      );
+      if (requestIdRef.current === requestId) {
+        setResult(body);
+        sessionStorage.setItem(
+          `sts-report:${window.location.search}`,
+          JSON.stringify(body),
+        );
+      }
     } catch (caught) {
-      setError((caught as Error).message);
+      if (requestIdRef.current === requestId && !controller.signal.aborted) {
+        setError((caught as Error).message);
+      }
     } finally {
-      setLoading(false);
+      if (requestIdRef.current === requestId) {
+        requestRef.current = null;
+        setLoading(false);
+      }
     }
   };
 
@@ -112,6 +211,8 @@ export default function ReportBuilder() {
     URL.revokeObjectURL(url);
   };
 
+  if (!result && loading) return <ReportSkeleton stage={stage} />;
+
   if (!result) {
     return (
       <section className="card report-welcome">
@@ -123,8 +224,8 @@ export default function ReportBuilder() {
           החריגות וההמלצות שנוצרו באמצעות AI.
         </p>
         {error && <div className="report-error" role="alert">{errors[error] ?? 'יצירת הדוח נכשלה. נסו שוב.'}</div>}
-        <button className="btn primary" disabled={loading} onClick={() => void generate()}>
-          {loading ? 'יוצר דוח ומנתח נתונים…' : 'יצירת דוח ניהולי'}
+        <button className="btn primary" onClick={() => void generate()}>
+          יצירת דוח ניהולי
         </button>
         <small>מדדים מסוכמים נשלחים ל-OpenRouter. הדוח נשמר בלשונית הדפדפן וניתן לייצא ל-CSV או ל-PDF.</small>
       </section>
@@ -133,20 +234,21 @@ export default function ReportBuilder() {
 
   const report = result.report;
   return (
-    <div className="report-page">
+    <div className="report-page" aria-busy={loading}>
       <section className="report-actions card" data-print-hidden>
         <div>
           <strong>הדוח מוכן</strong>
           <span className="ltr">{new Date(result.generatedAt).toLocaleString('he-IL')}</span>
         </div>
         <div>
-          <button className="btn" disabled={loading} onClick={() => void generate()}>
+          <button className="btn" onClick={() => void generate()}>
             {loading ? 'מעדכן…' : 'יצירה מחדש'}
           </button>
           <button className="btn" onClick={downloadCsv}>הורדת CSV</button>
           <button className="btn primary" onClick={() => window.print()}>ייצוא PDF</button>
         </div>
       </section>
+      {loading && <AiGenerationProgress stage={stage} />}
       {error && <div className="report-error" role="alert">{errors[error] ?? 'עדכון הדוח נכשל.'}</div>}
 
       <article className="management-report card">

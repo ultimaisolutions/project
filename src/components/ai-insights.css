@@ -49,18 +49,6 @@
   margin-top: 16px;
 }
 
-.spinner {
-  display: inline-block;
-  width: 15px;
-  height: 15px;
-  margin-inline-end: 7px;
-  border: 2px solid rgba(7, 17, 31, .35);
-  border-top-color: var(--bg-canvas);
-  border-radius: 50%;
-  vertical-align: -2px;
-  animation: spin .8s linear infinite;
-}
-
 .ai-error {
   width: min(100%, 680px);
   padding: 12px 14px;
@@ -72,8 +60,47 @@
 
 .insights-page,
 .insight-section {
+  min-width: 0;
   display: grid;
   gap: 16px;
+}
+
+.insights-loading > *,
+.insights-skeleton-summary > div,
+.insights-skeleton-cards .insight-card > div {
+  min-width: 0;
+}
+
+.skeleton-eyebrow {
+  width: 110px;
+  height: 12px;
+}
+
+.skeleton-summary-line {
+  width: min(680px, 88%);
+  height: 21px;
+  margin-top: 14px;
+}
+
+.skeleton-summary-line.short {
+  width: min(520px, 68%);
+  margin-top: 9px;
+}
+
+.skeleton-meta-line {
+  width: min(310px, 45%);
+  height: 11px;
+  margin-top: 16px;
+}
+
+.skeleton-section-title {
+  width: 210px;
+  height: 20px;
+}
+
+.skeleton-index {
+  width: 32px;
+  height: 32px;
 }
 
 .executive-summary {
@@ -235,12 +262,6 @@
   border-color: rgba(167, 139, 250, .3);
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 @media (max-width: 800px) {
   .insight-welcome {
     min-height: 460px;
@@ -268,5 +289,10 @@
   .insight-card {
     grid-template-columns: 30px 1fr;
     padding: 16px;
+  }
+
+  .skeleton-meta-line,
+  .skeleton-card-title {
+    width: 58%;
   }
 }
