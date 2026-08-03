@@ -1,0 +1,236 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="svg-title svg-desc">
+  <title id="svg-title">STSICONIC BI Application Architecture</title>
+  <desc id="svg-desc">Client-facing architecture schematic showing the browser UI, authenticated Astro application on Vercel, cache-aware Google Sheets data flow, deterministic analytics and AI workflows, external providers, and security guarantees.</desc>
+  <defs>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#315f7d"/>
+    </marker>
+    <marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#59636e"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#587b69"/>
+    </marker>
+    <style>
+      text{font-family:Inter,Arial,sans-serif;fill:#18222d}
+      .title{font-size:34px;font-weight:700;letter-spacing:-.3px}
+      .subtitle{font-size:15px;fill:#55616d}
+      .section{font-size:19px;font-weight:700;letter-spacing:.3px}
+      .group{font-size:16px;font-weight:700}
+      .label{font-size:14px;font-weight:650}
+      .body{font-size:13px;fill:#35424e}
+      .small{font-size:11.5px;fill:#4f5c68}
+      .micro{font-size:10.5px;fill:#5c6873}
+      .panel{fill:#fff;stroke:#cbd3da;stroke-width:1.5}
+      .soft{fill:#f7f8fa;stroke:#d8dee4;stroke-width:1.2}
+      .server{fill:#fbfcfd;stroke:#315f7d;stroke-width:2}
+      .accent{fill:#eef3f6;stroke:#7f9aab;stroke-width:1.3}
+      .external{fill:#fff;stroke:#aab3bb;stroke-width:1.4}
+      .sheet{fill:#f6faf8;stroke:#789686;stroke-width:1.5}
+      .flow{fill:none;stroke:#315f7d;stroke-width:2;marker-end:url(#arrow-blue)}
+      .relation{fill:none;stroke:#59636e;stroke-width:1.7;marker-end:url(#arrow-gray)}
+      .relation-bi{fill:none;stroke:#59636e;stroke-width:1.7;marker-start:url(#arrow-gray);marker-end:url(#arrow-gray)}
+      .sheet-flow{fill:none;stroke:#587b69;stroke-width:1.8;marker-start:url(#arrow-green);marker-end:url(#arrow-green)}
+      .optional{fill:none;stroke:#7b858f;stroke-width:1.5;stroke-dasharray:5 4;marker-end:url(#arrow-gray)}
+      .divider{stroke:#e0e4e8;stroke-width:1}
+      .pill{fill:#eef3f6;stroke:#9cb0bd;stroke-width:1}
+      .security{fill:#f8f9fa;stroke:#d8dee4;stroke-width:1.2}
+    </style>
+  </defs>
+
+  <rect width="1920" height="1080" fill="#ffffff"/>
+
+  <text x="40" y="48" class="title">STSICONIC BI — Application Architecture</text>
+  <text x="40" y="75" class="subtitle">Astro 6 SSR · React 19 islands · Clerk authentication · Google Sheets analytics · Prisma Next settings · grounded AI workflows</text>
+  <text x="1880" y="48" text-anchor="end" class="small">Client architecture overview · 16:9</text>
+
+  <!-- Browser -->
+  <rect x="40" y="100" width="290" height="750" rx="10" class="panel"/>
+  <rect x="40" y="100" width="290" height="48" rx="10" fill="#eef3f6"/>
+  <path d="M40 138V110Q40 100 50 100H320Q330 100 330 110V148H40Z" fill="#eef3f6"/>
+  <text x="60" y="131" class="section">1 · Browser</text>
+  <text x="60" y="169" class="small">Hebrew-first RTL interface</text>
+
+  <rect x="60" y="190" width="250" height="56" rx="7" class="soft"/>
+  <text x="80" y="216" class="label">Clerk Sign-In</text>
+  <text x="80" y="234" class="small">Public authentication route</text>
+
+  <rect x="60" y="260" width="250" height="56" rx="7" class="soft"/>
+  <text x="80" y="286" class="label">Astro SSR Pages</text>
+  <text x="80" y="304" class="small">Server-rendered page shells</text>
+
+  <text x="60" y="350" class="group">React islands</text>
+  <rect x="60" y="366" width="250" height="45" rx="6" class="panel"/>
+  <text x="80" y="394" class="label">Dashboard</text>
+  <rect x="60" y="421" width="250" height="45" rx="6" class="panel"/>
+  <text x="80" y="449" class="label">Data Settings</text>
+  <rect x="60" y="476" width="250" height="45" rx="6" class="panel"/>
+  <text x="80" y="504" class="label">AI Insights</text>
+  <rect x="60" y="531" width="250" height="45" rx="6" class="panel"/>
+  <text x="80" y="559" class="label">Questions Agent</text>
+  <rect x="60" y="586" width="250" height="45" rx="6" class="panel"/>
+  <text x="80" y="614" class="label">Report Builder</text>
+  <rect x="60" y="641" width="250" height="45" rx="6" class="panel"/>
+  <text x="80" y="669" class="label">Image Studio</text>
+
+  <line x1="60" y1="712" x2="310" y2="712" class="divider"/>
+  <text x="60" y="739" class="small">Shared URL filters</text>
+  <text x="60" y="758" class="micro">Dashboard · Insights · Questions · Report</text>
+  <text x="60" y="790" class="small">ECharts 6</text>
+  <text x="60" y="809" class="micro">Loaded by the Dashboard island</text>
+
+  <!-- Server trust boundary -->
+  <rect x="360" y="100" width="1080" height="750" rx="10" class="server"/>
+  <text x="382" y="131" class="section">2 · Astro 6 SSR on Vercel</text>
+  <text x="1418" y="131" text-anchor="end" class="small">Authenticated application boundary</text>
+
+  <!-- Middleware -->
+  <rect x="385" y="150" width="1030" height="62" rx="8" class="accent"/>
+  <text x="410" y="177" class="group">Clerk Middleware</text>
+  <text x="410" y="198" class="small">Protects application pages and /api/* · API handlers derive userId server-side</text>
+  <path d="M330 340H345V181H385" class="flow"/>
+
+  <!-- API groups -->
+  <rect x="385" y="232" width="250" height="105" rx="7" class="soft"/>
+  <text x="405" y="258" class="group">Dashboard API</text>
+  <text x="405" y="284" class="body">GET /api/dashboard</text>
+  <text x="405" y="307" class="small">URL filters · refresh bypass</text>
+  <text x="405" y="325" class="small">KPIs, leaders and chart series</text>
+
+  <rect x="650" y="232" width="345" height="105" rx="7" class="soft"/>
+  <text x="670" y="258" class="group">Settings API</text>
+  <text x="670" y="282" class="body">GET | PUT | DELETE /api/data-settings</text>
+  <text x="670" y="304" class="body">POST /api/data-settings/test</text>
+  <text x="670" y="325" class="small">Test before save · encrypt/upsert · invalidate cache</text>
+
+  <rect x="1010" y="232" width="405" height="105" rx="7" class="soft"/>
+  <text x="1030" y="258" class="group">AI APIs</text>
+  <text x="1030" y="282" class="body">POST /api/ai/insights · POST /api/ai/questions</text>
+  <text x="1030" y="304" class="body">POST /api/ai/report · POST /api/ai/image</text>
+  <text x="1030" y="325" class="small">All reuse the same Sheet loading and filter pipeline</text>
+
+  <path d="M515 212V232" class="flow"/>
+  <path d="M823 212V232" class="flow"/>
+  <path d="M1213 212V232" class="flow"/>
+
+  <!-- Cache-aware data pipeline -->
+  <text x="385" y="371" class="group">Shared Sheet loading and deterministic analytics</text>
+
+  <rect x="385" y="390" width="185" height="66" rx="7" class="panel"/>
+  <text x="477" y="417" text-anchor="middle" class="label">Connection Repository</text>
+  <text x="477" y="438" text-anchor="middle" class="small">Prisma Next</text>
+
+  <path d="M570 423H605" class="flow"/>
+  <path d="M655 388L705 423 655 458 605 423Z" class="accent"/>
+  <text x="655" y="418" text-anchor="middle" class="small">Cache</text>
+  <text x="655" y="435" text-anchor="middle" class="small">hit?</text>
+
+  <path d="M705 423H770V548H825" class="flow"/>
+  <text x="725" y="414" class="micro">HIT</text>
+
+  <path d="M655 458V479H755" class="flow"/>
+  <text x="670" y="475" class="micro">MISS</text>
+
+  <rect x="755" y="465" width="170" height="66" rx="7" class="panel"/>
+  <text x="840" y="491" text-anchor="middle" class="label">Decrypt API key</text>
+  <text x="840" y="511" text-anchor="middle" class="small">AES-256-GCM</text>
+  <text x="840" y="526" text-anchor="middle" class="micro">Clerk userId as AAD</text>
+
+  <path d="M925 498H955" class="flow"/>
+  <rect x="955" y="465" width="190" height="66" rx="7" class="panel"/>
+  <text x="1050" y="490" text-anchor="middle" class="label">Google Sheets ingestion</text>
+  <text x="1050" y="510" text-anchor="middle" class="small">Metadata + worksheet values</text>
+  <text x="1050" y="526" text-anchor="middle" class="micro">15-header contract · read-only</text>
+
+  <path d="M1145 498H1175" class="flow"/>
+  <rect x="1175" y="465" width="215" height="66" rx="7" class="panel"/>
+  <text x="1282" y="490" text-anchor="middle" class="label">Parse + cache</text>
+  <text x="1282" y="510" text-anchor="middle" class="small">60-second process memory</text>
+  <text x="1282" y="526" text-anchor="middle" class="micro">Mark successful synchronization</text>
+
+  <path d="M1282 531V548H1125" class="flow"/>
+  <rect x="825" y="548" width="300" height="64" rx="7" class="accent"/>
+  <text x="975" y="575" text-anchor="middle" class="label">Filter + compare + aggregate</text>
+  <text x="975" y="596" text-anchor="middle" class="small">KPIs · previous period · leaders · chart series</text>
+
+  <path d="M975 612V642" class="flow"/>
+  <rect x="825" y="642" width="300" height="58" rx="7" class="panel"/>
+  <text x="975" y="668" text-anchor="middle" class="label">Deterministic analytics snapshot</text>
+  <text x="975" y="688" text-anchor="middle" class="small">Bounded metrics, rankings and evidence catalog</text>
+
+  <!-- AI orchestration -->
+  <rect x="385" y="720" width="1030" height="106" rx="8" class="soft"/>
+  <text x="405" y="746" class="group">AI orchestration after deterministic grounding</text>
+  <line x1="405" y1="756" x2="1395" y2="756" class="divider"/>
+  <text x="405" y="779" class="small"><tspan font-weight="700">Insights</tspan><tspan> · OpenRouter structured output → evidence and ROI-semantic validation</tspan></text>
+  <text x="405" y="799" class="small"><tspan font-weight="700">Questions</tspan><tspan> · deterministic tools ↔ OpenRouter tool loop → grounded answer</tspan></text>
+  <text x="405" y="819" class="small"><tspan font-weight="700">Report</tspan><tspan> · OpenRouter grounded insights → deterministic report assembly</tspan></text>
+  <text x="900" y="779" class="small"><tspan font-weight="700">Image Studio</tspan><tspan> · image facts → OpenRouter prompt → OpenAI → direct WebP</tspan></text>
+  <text x="900" y="799" class="micro"><tspan font-weight="700">Questions image tool only</tspan><tspan> · same image flow → user-scoped memory (10 min)</tspan></text>
+  <path d="M975 700V720" class="flow"/>
+
+  <!-- External systems -->
+  <rect x="1470" y="100" width="410" height="750" rx="10" class="panel"/>
+  <rect x="1470" y="100" width="410" height="48" rx="10" fill="#f3f5f6"/>
+  <path d="M1470 138V110Q1470 100 1480 100H1870Q1880 100 1880 110V148H1470Z" fill="#f3f5f6"/>
+  <text x="1490" y="131" class="section">3 · External services</text>
+
+  <rect x="1490" y="160" width="370" height="76" rx="7" class="external"/>
+  <text x="1510" y="188" class="group">Clerk</text>
+  <text x="1510" y="210" class="small">Authentication and per-user identity</text>
+  <text x="1510" y="228" class="micro">Server-side caller: Clerk Middleware</text>
+
+  <rect x="1490" y="370" width="370" height="90" rx="7" class="external"/>
+  <text x="1510" y="398" class="group">PostgreSQL</text>
+  <text x="1510" y="420" class="small">SheetConnection settings only</text>
+  <text x="1510" y="440" class="small">Encrypted API key + Sheet metadata · no worksheet rows</text>
+  <text x="1510" y="455" class="micro">Server-side caller: Connection Repository</text>
+
+  <rect x="1490" y="480" width="370" height="90" rx="7" class="sheet"/>
+  <text x="1510" y="508" class="group">Google Sheets API v4</text>
+  <text x="1510" y="530" class="small">Read-only analytics source of truth</text>
+  <text x="1510" y="550" class="small">Metadata and worksheet values · rows never persisted</text>
+  <text x="1510" y="566" class="micro">Server-side caller: Google Sheets ingestion</text>
+
+  <rect x="1490" y="640" width="370" height="96" rx="7" class="external"/>
+  <text x="1510" y="668" class="group">OpenRouter</text>
+  <text x="1510" y="690" class="small">deepseek/deepseek-v4-flash</text>
+  <text x="1510" y="709" class="small">Structured insights · tool loop · prompt drafting</text>
+  <text x="1510" y="727" class="micro">Server-side caller: AI orchestration</text>
+
+  <rect x="1490" y="750" width="370" height="76" rx="7" class="external"/>
+  <text x="1510" y="778" class="group">OpenAI</text>
+  <text x="1510" y="800" class="small">gpt-image-2 · base64 WebP generation</text>
+  <text x="1510" y="818" class="micro">Server-side caller: image workflows</text>
+
+  <!-- Security footer -->
+  <rect x="40" y="880" width="1840" height="160" rx="10" class="security"/>
+  <text x="60" y="914" class="section">Security and data guarantees</text>
+  <line x1="60" y1="930" x2="1860" y2="930" class="divider"/>
+
+  <circle cx="77" cy="963" r="10" fill="#315f7d"/>
+  <text x="77" y="967" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">1</text>
+  <text x="96" y="968" class="small">Clerk protects application pages and APIs</text>
+
+  <circle cx="395" cy="963" r="10" fill="#315f7d"/>
+  <text x="395" y="967" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">2</text>
+  <text x="414" y="968" class="small">Google Sheets remains read-only</text>
+
+  <circle cx="690" cy="963" r="10" fill="#315f7d"/>
+  <text x="690" y="967" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">3</text>
+  <text x="709" y="968" class="small">PostgreSQL stores connection settings only</text>
+
+  <circle cx="1035" cy="963" r="10" fill="#315f7d"/>
+  <text x="1035" y="967" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">4</text>
+  <text x="1054" y="968" class="small">AES-256-GCM is bound to Clerk userId</text>
+
+  <circle cx="1385" cy="963" r="10" fill="#315f7d"/>
+  <text x="1385" y="967" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">5</text>
+  <text x="1404" y="968" class="small">Responses: no-store + safe error codes</text>
+
+  <circle cx="77" cy="1004" r="10" fill="#315f7d"/>
+  <text x="77" y="1008" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">6</text>
+  <text x="96" y="1009" class="small">AI providers receive bounded analytics or drafted prompts—not API keys or raw worksheet rows</text>
+
+  <text x="1860" y="1010" text-anchor="end" class="micro">Solid blue: internal request/data flow · Gray: provider/repository relationship · Green: read-only Sheet access</text>
+</svg>
