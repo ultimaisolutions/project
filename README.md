@@ -83,6 +83,7 @@ bun run dev
 ```
 If you're linked to the vercel project, use `vercel env pull` instead of `cp .env.example .env.local` - that will create an .env.local file and pull the env variables
 straight from vercel.
+
 Clerk should enable Google and/or email-password authentication, self-service sign-up, and `http://localhost:4321/sign-in/sso-callback` for local OAuth callbacks.
 
 ### Environment variables
