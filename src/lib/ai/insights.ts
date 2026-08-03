@@ -11,6 +11,8 @@ import {
 } from './insights-schema';
 import {
   generateStructuredObject,
+  INSIGHTS_MAX_TOKENS,
+  type StructuredGenerationStage,
   withStructuredOutputRetry,
 } from './openrouter';
 
@@ -44,7 +46,16 @@ const retryInstructions = `
 אין לכתוב ספרות בטקסט החופשי ואין להוסיף שדות שאינם בסכמה.
 `.trim();
 
-export async function generateGroundedInsights(snapshot: AnalyticsSnapshot) {
+type GroundedInsightsGenerationOptions = {
+  signal?: AbortSignal;
+  onProgress?: (stage: StructuredGenerationStage) => void;
+  route?: 'insights' | 'report';
+};
+
+export async function generateGroundedInsights(
+  snapshot: AnalyticsSnapshot,
+  generationOptions: GroundedInsightsGenerationOptions = {},
+) {
   if (snapshot.rowCount === 0) {
     throw Object.assign(new Error('NO_DATA'), { code: 'NO_DATA' });
   }
@@ -73,9 +84,13 @@ export async function generateGroundedInsights(snapshot: AnalyticsSnapshot) {
       : [...messages, { role: 'system', content: retryInstructions }],
     schema: outputSchema,
     schemaName: 'stsiconic_insights',
-    maxTokens: 3_200,
+    maxTokens: INSIGHTS_MAX_TOKENS,
     temperature: attempt === 0 ? 0.2 : 0,
-  }));
+    signal: generationOptions.signal,
+    onProgress: generationOptions.onProgress,
+    route: generationOptions.route ?? 'insights',
+    attempt,
+  }), { onProgress: generationOptions.onProgress });
 
   validateInsightEvidence(output, allowedKeys);
   validateInsightSemantics(output, catalog);
