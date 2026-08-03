@@ -4,6 +4,7 @@ export type AiProgressStage = 'loading-data' | 'generating' | 'validating' | 're
 
 export type AiStreamEvent<T> =
   | { type: 'progress'; stage: AiProgressStage }
+  | { type: 'text-delta'; text: string }
   | { type: 'result'; data: T }
   | { type: 'error'; error: string };
 
@@ -17,6 +18,7 @@ export function encodeNdjsonEvent<T>(event: AiStreamEvent<T>) {
 type AiStreamWriter = {
   signal: AbortSignal;
   progress: (stage: AiProgressStage) => void;
+  text: (text: string) => void;
 };
 
 /** Returns whether a request explicitly negotiated the NDJSON media type. */
@@ -87,6 +89,7 @@ export function ndjson<T>(
           const result = await operation({
             signal: downstream.signal,
             progress: (stage) => { emit({ type: 'progress', stage }); },
+            text: (text) => { emit({ type: 'text-delta', text }); },
           });
           emit({ type: 'result', data: result });
         } catch (error) {

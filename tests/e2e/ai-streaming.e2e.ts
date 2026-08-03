@@ -73,9 +73,40 @@ const reportResult = {
   lastSyncAt: '2026-08-03T08:30:00.000Z',
 };
 
+const questionMarkdown = [
+  '## מצב הביצועים',
+  '',
+  '**ההכנסות חזקות** ביחס לתקופה.',
+  '',
+  '- Google מוביל',
+  '- העלות נשלטת',
+  '',
+  '[דוח חיצוני](https://example.com/reports/a-very-long-safe-report-url)',
+  '',
+  '`campaign_identifier_with_a_very_long_unbroken_value_1234567890`',
+  '',
+  '| מדד | ערך |',
+  '| --- | ---: |',
+  '| ROI | 700% |',
+].join('\n');
+
+const questionResult = {
+  answer: `${questionMarkdown}\n\nהתשובה הושלמה.`,
+  evidence: [],
+  images: [],
+  context: {
+    period: { from: '2026-07-01', to: '2026-07-31' },
+    rowCount: 12,
+    lastSyncAt: '2026-08-03T08:30:00.000Z',
+  },
+};
+
 type BrowserTestWindow = Window & {
   __finishAiTest?: () => void;
+  __emitAiTest?: (event: unknown) => void;
   __aiAccept?: string | null;
+  __aiAborted?: boolean;
+  __aiStreamCancelled?: boolean;
   __vite_plugin_react_preamble_installed__?: boolean;
   $RefreshReg$?: () => void;
   $RefreshSig$?: () => (type: unknown) => unknown;
@@ -84,14 +115,17 @@ type BrowserTestWindow = Window & {
 async function mountAiScreen(
   page: Page,
   options: {
-    component: 'AiInsights' | 'ReportBuilder';
-    pathname: '/ai-insights' | '/report';
-    endpoint: '/api/ai/insights' | '/api/ai/report';
+    component: 'AiInsights' | 'QuestionsAgent' | 'ReportBuilder';
+    pathname: '/ai-insights' | '/questions' | '/report';
+    endpoint: '/api/ai/insights' | '/api/ai/questions' | '/api/ai/report';
     result: unknown;
+    initialEvents?: unknown[];
   },
 ) {
   await page.goto('/sign-in', { waitUntil: 'domcontentloaded' });
-  await page.evaluate(({ component, endpoint, pathname, result }) => {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await page.evaluate(({ component, endpoint, initialEvents, pathname, result }) => {
     const testWindow = window as BrowserTestWindow;
     const nativeFetch = window.fetch.bind(window);
     window.history.replaceState({}, '', `${pathname}?channel=Google`);
@@ -105,24 +139,32 @@ async function mountAiScreen(
         return nativeFetch(input, init);
       }
       testWindow.__aiAccept = new Headers(init?.headers).get('accept');
+      testWindow.__aiAborted = false;
+      testWindow.__aiStreamCancelled = false;
+      init?.signal?.addEventListener('abort', () => {
+        testWindow.__aiAborted = true;
+      }, { once: true });
       const encoder = new TextEncoder();
       return new Response(new ReadableStream<Uint8Array>({
         start(controller) {
-          controller.enqueue(encoder.encode(`${JSON.stringify({
-            type: 'progress',
-            stage: 'loading-data',
-          })}\n`));
-          controller.enqueue(encoder.encode(`${JSON.stringify({
-            type: 'progress',
-            stage: 'generating',
-          })}\n`));
+          const emit = (event: unknown) => {
+            controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+          };
+          for (const event of initialEvents ?? [
+            { type: 'progress', stage: 'loading-data' },
+            { type: 'progress', stage: 'generating' },
+          ]) emit(event);
+          testWindow.__emitAiTest = emit;
           testWindow.__finishAiTest = () => {
-            controller.enqueue(encoder.encode(`${JSON.stringify({
+            emit({
               type: 'result',
               data: result,
-            })}\n`));
+            });
             controller.close();
           };
+        },
+        cancel() {
+          testWindow.__aiStreamCancelled = true;
         },
       }), {
         headers: { 'content-type': 'application/x-ndjson; charset=utf-8' },
@@ -159,7 +201,17 @@ async function mountAiScreen(
         react.default.createElement(screen.default),
       );
     })();
-  }, options);
+      }, options);
+      return;
+    } catch (error) {
+      if (
+        attempt > 0
+        || !(error instanceof Error)
+        || !error.message.includes('Execution context was destroyed')
+      ) throw error;
+      await page.waitForLoadState('domcontentloaded');
+    }
+  }
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
@@ -196,6 +248,52 @@ test('AI insights exposes streamed busy state and remains usable without overflo
   await page.evaluate(() => (window as BrowserTestWindow).__finishAiTest?.());
   await expect(page.getByText(insights.summary)).toBeVisible();
   await expect(page.getByRole('button', { name: 'ניתוח מחדש' })).toBeEnabled();
+  await expectNoHorizontalOverflow(page);
+});
+
+test('questions agent streams safe Markdown, announces stable status, and cancels a new chat without overflow', async ({ page }) => {
+  await mountAiScreen(page, {
+    component: 'QuestionsAgent',
+    pathname: '/questions',
+    endpoint: '/api/ai/questions',
+    result: questionResult,
+    initialEvents: [],
+  });
+
+  await page.getByRole('button', { name: 'איזה קמפיין היה הכי רווחי?' }).click();
+  const conversation = page.getByTestId('questions-conversation');
+  await expect(conversation).toHaveAttribute('aria-busy', 'true');
+  await expect(page.getByRole('status')).toHaveText('הסוכן מייצר תשובה…');
+  await expect(page.getByText('בודק את הנתונים…')).toBeVisible();
+  expect(await page.evaluate(() => (window as BrowserTestWindow).__aiAccept))
+    .toBe('application/x-ndjson');
+
+  await page.evaluate((text) => (window as BrowserTestWindow).__emitAiTest?.({
+    type: 'text-delta',
+    text,
+  }), questionMarkdown);
+  await expect(page.getByRole('heading', { name: 'מצב הביצועים' })).toBeVisible();
+  await expect(page.locator('.message.assistant strong')).toHaveText('ההכנסות חזקות');
+  await expect(page.getByText('בודק את הנתונים…')).toBeHidden();
+  await expectNoHorizontalOverflow(page);
+
+  await page.evaluate(() => (window as BrowserTestWindow).__finishAiTest?.());
+  await expect(conversation.getByText('התשובה הושלמה.')).toBeVisible();
+  await expect(conversation).toHaveAttribute('aria-busy', 'false');
+  await expect(page.getByRole('status')).toHaveText('התשובה הושלמה.');
+  await expectNoHorizontalOverflow(page);
+
+  await page.getByRole('button', { name: 'שיחה חדשה' }).click();
+  await page.getByRole('button', { name: 'איזה ערוץ מביא את הלידים הזולים ביותר?' }).click();
+  await expect(conversation).toHaveAttribute('aria-busy', 'true');
+  await page.getByRole('button', { name: 'שיחה חדשה' }).click();
+
+  await expect.poll(() => page.evaluate(() => ({
+    aborted: (window as BrowserTestWindow).__aiAborted,
+    cancelled: (window as BrowserTestWindow).__aiStreamCancelled,
+  }))).toEqual({ aborted: true, cancelled: true });
+  await expect(conversation).toHaveAttribute('aria-busy', 'false');
+  await expect(page.getByText('מה תרצו לדעת על הביצועים?')).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
 

@@ -29,19 +29,26 @@ describe('AI NDJSON browser client', () => {
   test('parses Hebrew events across arbitrary byte boundaries and ignores unknown events', async () => {
     const bytes = encoder.encode([
       JSON.stringify({ type: 'progress', stage: 'loading-data' }),
+      JSON.stringify({ type: 'text-delta', text: 'תשובה ' }),
       JSON.stringify({ type: 'future-pulse', detail: 'לא להצגה' }),
+      JSON.stringify({ type: 'text-delta', text: 'מדורגת 📊' }),
       JSON.stringify({ type: 'progress', stage: 'generating' }),
       JSON.stringify({ type: 'result', data: { summary: 'תוצאה סופית 📊' } }),
       '',
     ].join('\n'));
     const stages: string[] = [];
+    const textDeltas: string[] = [];
 
     const result = await readAiStream<{ summary: string }>(
       responseFromBytes(bytes, [1, 2, 3, 1, 7, 2, 1, 4, 1, 9]),
-      { onProgress: (stage) => stages.push(stage) },
+      {
+        onProgress: (stage) => stages.push(stage),
+        onTextDelta: (text) => textDeltas.push(text),
+      },
     );
 
     expect(stages).toEqual(['loading-data', 'generating']);
+    expect(textDeltas).toEqual(['תשובה ', 'מדורגת 📊']);
     expect(result).toEqual({ summary: 'תוצאה סופית 📊' });
   });
 

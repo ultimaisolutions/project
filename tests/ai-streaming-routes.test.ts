@@ -8,6 +8,7 @@ import {
 import { generateGroundedInsights } from '../src/lib/ai/insights';
 import { readAiStream } from '../src/lib/ai-stream-client';
 import { createInsightsPost } from '../src/pages/api/ai/insights';
+import { createQuestionsPost } from '../src/pages/api/ai/questions';
 import { createReportPost } from '../src/pages/api/ai/report';
 import type { SheetRow } from '../src/lib/sheets';
 
@@ -96,6 +97,24 @@ function requestFor(
   });
 }
 
+function questionsRequest(
+  accept = 'application/x-ndjson',
+  signal?: AbortSignal,
+) {
+  return new Request('http://localhost/api/ai/questions', {
+    method: 'POST',
+    headers: {
+      accept,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      query: '?channel=Google',
+      messages: [{ role: 'user', content: 'מה מצב ההכנסות?' }],
+    }),
+    signal,
+  });
+}
+
 async function invoke(handler: APIRoute, request: Request, userId = 'user_123') {
   return handler({
     locals: { auth: () => ({ userId }) },
@@ -153,9 +172,193 @@ describe('NDJSON transport contract', () => {
     expect(read).toEqual({ done: true, value: undefined });
     expect(started).toBe(false);
   });
+
+  test('emits ordered text deltas before the terminal result', async () => {
+    const response = ndjson(new Request('http://localhost'), async (writer) => {
+      writer.text('תשובה ');
+      writer.text('חלקית 📊');
+      return { answer: 'תשובה חלקית 📊' };
+    });
+
+    expect(await readEvents(response)).toEqual([
+      { type: 'text-delta', text: 'תשובה ' },
+      { type: 'text-delta', text: 'חלקית 📊' },
+      { type: 'result', data: { answer: 'תשובה חלקית 📊' } },
+    ]);
+  });
 });
 
 describe('negotiated AI route streaming', () => {
+  test('streams only answer text before server-collected question metadata', async () => {
+    const steps = [{
+      toolResults: [{
+        toolName: 'createMarketingImage',
+        output: { assetId: 'asset-1', title: 'תמונת ביצועים' },
+      }],
+    }];
+    const handler = createQuestionsPost({
+      loadSheetForUser: async () => sheet,
+      createAnalyticsAgent: () => ({
+        generate: async () => { throw new Error('JSON path was not expected'); },
+        stream: async () => ({
+          stream: (async function* answerParts() {
+            yield { type: 'reasoning-delta', text: 'private reasoning' };
+            yield { type: 'tool-input-delta', delta: 'private tool input' };
+            yield { type: 'text-delta', text: 'ההכנסות ' };
+            yield { type: 'raw', rawValue: { provider: 'private metadata' } };
+            yield { type: 'text-delta', text: '**חזקות**.' };
+          })(),
+          text: Promise.resolve('ההכנסות **חזקות**.'),
+          steps: Promise.resolve(steps),
+        }),
+      }),
+      getImageAsset: () => ({
+        imageBase64: 'c2FmZS1pbWFnZQ==',
+        mimeType: 'image/webp',
+        prompt: 'Safe visual prompt',
+        title: 'תמונת ביצועים',
+      }),
+    } as never);
+
+    const response = await invoke(handler, questionsRequest());
+    const raw = await response.text();
+    const events = raw.trimEnd().split('\n').map((line) => JSON.parse(line));
+
+    expect(events.map((event) => event.type)).toEqual([
+      'text-delta',
+      'text-delta',
+      'result',
+    ]);
+    expect(events.slice(0, 2)).toEqual([
+      { type: 'text-delta', text: 'ההכנסות ' },
+      { type: 'text-delta', text: '**חזקות**.' },
+    ]);
+    expect(events.at(-1)).toEqual({
+      type: 'result',
+      data: {
+        answer: 'ההכנסות **חזקות**.',
+        evidence: [{
+          toolName: 'createMarketingImage',
+          output: { assetId: 'asset-1', title: 'תמונת ביצועים' },
+        }],
+        images: [{
+          assetId: 'asset-1',
+          imageBase64: 'c2FmZS1pbWFnZQ==',
+          mimeType: 'image/webp',
+          prompt: 'Safe visual prompt',
+          title: 'תמונת ביצועים',
+        }],
+        context: {
+          period: { from: '2026-06-06', to: '2026-07-05' },
+          rowCount: 1,
+          lastSyncAt: '2026-08-03T08:30:00.000Z',
+        },
+      },
+    });
+    expect(raw).not.toContain('private reasoning');
+    expect(raw).not.toContain('private tool input');
+    expect(raw).not.toContain('private metadata');
+  });
+
+  test('preserves the existing questions JSON response for ordinary callers', async () => {
+    const steps = [{
+      toolResults: [{
+        toolName: 'overview',
+        output: { evidence: [{ key: 'kpi.revenue.current', value: 8_000 }] },
+      }],
+    }];
+    const handler = createQuestionsPost({
+      loadSheetForUser: async () => sheet,
+      createAnalyticsAgent: () => ({
+        generate: async () => ({ text: 'תשובה סופית', steps }),
+        stream: async () => { throw new Error('stream path was not expected'); },
+      }),
+      getImageAsset: () => null,
+    } as never);
+
+    const response = await invoke(handler, questionsRequest('application/json'));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('application/json; charset=utf-8');
+    expect(await response.json()).toEqual({
+      answer: 'תשובה סופית',
+      evidence: [{
+        toolName: 'overview',
+        output: { evidence: [{ key: 'kpi.revenue.current', value: 8_000 }] },
+      }],
+      images: [],
+      context: {
+        period: { from: '2026-06-06', to: '2026-07-05' },
+        rowCount: 1,
+        lastSyncAt: '2026-08-03T08:30:00.000Z',
+      },
+    });
+  });
+
+  test('ends a failed question stream without emitting a result', async () => {
+    const handler = createQuestionsPost({
+      loadSheetForUser: async () => sheet,
+      createAnalyticsAgent: () => ({
+        generate: async () => { throw new Error('JSON path was not expected'); },
+        stream: async () => ({
+          stream: (async function* failedAnswer() {
+            yield { type: 'text-delta', text: 'תשובה חלקית' };
+            throw Object.assign(new Error('private provider failure'), {
+              code: 'AI_UPSTREAM_FAILED',
+            });
+          })(),
+          text: Promise.resolve('תשובה חלקית'),
+          steps: Promise.resolve([]),
+        }),
+      }),
+      getImageAsset: () => null,
+    } as never);
+
+    const response = await invoke(handler, questionsRequest());
+    const raw = await response.text();
+    const events = raw.trimEnd().split('\n').map((line) => JSON.parse(line));
+
+    expect(events).toEqual([
+      { type: 'text-delta', text: 'תשובה חלקית' },
+      { type: 'error', error: 'AI_UPSTREAM_FAILED' },
+    ]);
+    expect(events.some((event) => event.type === 'result')).toBe(false);
+    expect(raw).not.toContain('private provider failure');
+  });
+
+  test('aborts the questions agent when the browser cancels the stream', async () => {
+    let agentSignal: AbortSignal | undefined;
+    let agentStarted!: () => void;
+    const started = new Promise<void>((resolve) => { agentStarted = resolve; });
+    const handler = createQuestionsPost({
+      loadSheetForUser: async () => sheet,
+      createAnalyticsAgent: () => ({
+        generate: async () => { throw new Error('JSON path was not expected'); },
+        stream: async (options: { abortSignal?: AbortSignal }) => {
+          agentSignal = options.abortSignal;
+          agentStarted();
+          return {
+            stream: (async function* pendingAnswer() {
+              await new Promise((_, reject) => agentSignal?.addEventListener('abort', () => {
+                reject(agentSignal?.reason ?? new DOMException('Aborted', 'AbortError'));
+              }, { once: true }));
+            })(),
+            text: Promise.resolve(''),
+            steps: Promise.resolve([]),
+          };
+        },
+      }),
+      getImageAsset: () => null,
+    } as never);
+
+    const response = await invoke(handler, questionsRequest());
+    const reader = response.body?.getReader();
+    await started;
+    await reader?.cancel('new conversation');
+
+    expect(agentSignal?.aborted).toBe(true);
+  });
+
   test('streams insight progress, retry pulses, validation, and the existing result DTO', async () => {
     let loadedFor: unknown[] = [];
     let generationContext: Record<string, unknown> | undefined;

@@ -95,8 +95,10 @@
 
 .message {
   width: min(82%, 800px);
+  min-width: 0;
   padding: 14px 16px;
   border-radius: 14px;
+  overflow-wrap: anywhere;
 }
 
 .message.user {
@@ -125,6 +127,142 @@
   margin: 0;
   line-height: 1.7;
   white-space: pre-wrap;
+}
+
+.assistant-markdown {
+  min-width: 0;
+  line-height: 1.75;
+}
+
+.assistant-markdown > :first-child {
+  margin-top: 0;
+}
+
+.assistant-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.assistant-markdown h1,
+.assistant-markdown h2,
+.assistant-markdown h3,
+.assistant-markdown h4 {
+  margin: 1.15em 0 .45em;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.assistant-markdown h1 {
+  font-size: 20px;
+}
+
+.assistant-markdown h2 {
+  font-size: 18px;
+}
+
+.assistant-markdown h3 {
+  font-size: 16px;
+}
+
+.assistant-markdown h4 {
+  font-size: 14px;
+}
+
+.assistant-markdown p,
+.assistant-markdown ul,
+.assistant-markdown ol,
+.assistant-markdown blockquote,
+.assistant-markdown pre,
+.assistant-markdown .markdown-table-wrap {
+  margin: .65em 0;
+}
+
+.assistant-markdown ul,
+.assistant-markdown ol {
+  padding-inline-start: 1.4rem;
+}
+
+.assistant-markdown li + li {
+  margin-top: .25em;
+}
+
+.assistant-markdown a {
+  display: inline-block;
+  max-width: 100%;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  unicode-bidi: isolate;
+}
+
+.assistant-markdown code {
+  max-width: 100%;
+  padding: .12em .35em;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface-1);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: .9em;
+  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
+}
+
+.assistant-markdown pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-1);
+  text-align: left;
+  overscroll-behavior-inline: contain;
+}
+
+.assistant-markdown pre code {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow-wrap: normal;
+  white-space: pre;
+}
+
+.assistant-markdown blockquote {
+  padding-inline-start: 12px;
+  border-inline-start: 3px solid var(--accent);
+  color: var(--text-secondary);
+}
+
+.assistant-markdown hr {
+  margin: 1em 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.markdown-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.assistant-markdown table {
+  width: 100%;
+  min-width: 420px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.assistant-markdown th,
+.assistant-markdown td {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  text-align: right;
+  vertical-align: top;
+}
+
+.assistant-markdown th {
+  background: var(--surface-1);
+  color: var(--text-muted);
+  font-weight: 600;
 }
 
 .answer-evidence {
@@ -325,7 +463,20 @@
   }
 
   .message {
-    width: 92%;
+    width: 94%;
+    padding: 12px 13px;
+  }
+
+  .assistant-markdown h1 {
+    font-size: 18px;
+  }
+
+  .assistant-markdown h2 {
+    font-size: 16px;
+  }
+
+  .assistant-markdown table {
+    min-width: 360px;
   }
 
   .answer-evidence {

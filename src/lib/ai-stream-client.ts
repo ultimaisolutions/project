@@ -19,6 +19,7 @@ export const aiProgressLabels: Record<AiProgressStage, string> = {
 type StreamOptions = {
   signal?: AbortSignal;
   onProgress?: (stage: AiProgressStage) => void;
+  onTextDelta?: (text: string) => void;
 };
 
 type FetchOptions = StreamOptions & {
@@ -42,6 +43,9 @@ function parseEvent(value: unknown): AiStreamEvent<unknown> | null {
   const event = value as Record<string, unknown>;
   if (event.type === 'progress' && progressStages.has(event.stage as AiProgressStage)) {
     return { type: 'progress', stage: event.stage as AiProgressStage };
+  }
+  if (event.type === 'text-delta' && typeof event.text === 'string') {
+    return { type: 'text-delta', text: event.text };
   }
   if (event.type === 'result' && 'data' in event) {
     return { type: 'result', data: event.data };
@@ -71,7 +75,7 @@ async function readJsonFallback<T>(response: Response, signal?: AbortSignal) {
   return body as T;
 }
 
-/** Reads a negotiated AI response without ever exposing provider text chunks. */
+/** Reads a negotiated AI response and forwards only explicitly typed events. */
 export async function readAiStream<T>(
   response: Response,
   options: StreamOptions = {},
@@ -103,6 +107,7 @@ export async function readAiStream<T>(
     const event = parseEvent(decoded);
     if (!event) return;
     if (event.type === 'progress') options.onProgress?.(event.stage);
+    if (event.type === 'text-delta') options.onTextDelta?.(event.text);
     if (event.type === 'error') throw new Error(event.error);
     if (event.type === 'result') {
       hasResult = true;

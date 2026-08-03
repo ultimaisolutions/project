@@ -1,8 +1,13 @@
 import {
+  useEffect,
+  useRef,
   useState,
   type KeyboardEventHandler,
   type SyntheticEvent,
 } from 'react';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { fetchAiGeneration } from '../lib/ai-stream-client';
 import './questions-agent.css';
 
 type ToolEvidence = { toolName: string; output: unknown };
@@ -14,10 +19,23 @@ type GeneratedImage = {
   title: string;
 };
 type Message = {
+  id: string;
   role: 'user' | 'assistant';
   content: string;
   evidence?: ToolEvidence[];
   images?: GeneratedImage[];
+  pending?: boolean;
+};
+
+type QuestionResult = {
+  answer: string;
+  evidence: ToolEvidence[];
+  images: GeneratedImage[];
+  context: {
+    period: { from: string; to: string };
+    rowCount: number;
+    lastSyncAt: string | null;
+  };
 };
 
 const examples = [
@@ -47,6 +65,35 @@ const percent = new Intl.NumberFormat('he-IL', {
   style: 'percent',
   maximumFractionDigits: 1,
 });
+
+const markdownComponents: Components = {
+  a: ({ node: _node, ...props }) => (
+    <a {...props} dir="ltr" target="_blank" rel="noopener noreferrer" />
+  ),
+  code: ({ node: _node, ...props }) => <code {...props} dir="ltr" />,
+  pre: ({ node: _node, ...props }) => <pre {...props} dir="ltr" />,
+  table: ({ node: _node, ...props }) => (
+    <div className="markdown-table-wrap">
+      <table {...props} />
+    </div>
+  ),
+  img: () => null,
+};
+
+/** Renders model-authored Markdown without raw HTML or remote Markdown images. */
+function AssistantAnswer({ content }: { content: string }) {
+  return (
+    <div className="assistant-markdown">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={markdownComponents}
+        skipHtml
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
 
 /** Narrows an unknown tool result to a non-null record. */
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -153,44 +200,100 @@ export default function QuestionsAgent() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState<'idle' | 'generating' | 'complete'>('idle');
+  const activeRequest = useRef<AbortController | null>(null);
+  const requestSequence = useRef(0);
+
+  useEffect(() => () => {
+    requestSequence.current += 1;
+    activeRequest.current?.abort(new DOMException('Component unmounted.', 'AbortError'));
+    activeRequest.current = null;
+  }, []);
 
   /** Sends a bounded conversation and the active filters to the questions API. */
   const ask = async (question: string) => {
     const clean = question.trim();
     if (!clean || loading) return;
-    const userMessage: Message = { role: 'user', content: clean };
+    const requestId = requestSequence.current + 1;
+    requestSequence.current = requestId;
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    const userMessage: Message = {
+      id: `question-${requestId}`,
+      role: 'user',
+      content: clean,
+    };
+    const assistantId = `answer-${requestId}`;
+    const assistantMessage: Message = {
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      pending: true,
+    };
     const conversation = [...messages, userMessage].slice(-19);
-    setMessages(conversation);
+    setMessages([...conversation, assistantMessage]);
     setInput('');
     setLoading(true);
     setError(null);
+    setAnnouncement('generating');
+    const isCurrent = () => (
+      requestSequence.current === requestId && !controller.signal.aborted
+    );
     try {
-      const response = await fetch('/api/ai/questions', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
+      const result = await fetchAiGeneration<QuestionResult>(
+        '/api/ai/questions',
+        {
           query: window.location.search,
           messages: conversation.map(({ role, content }) => ({ role, content })),
-        }),
-      });
-      const body = await response.json() as {
-        answer?: string;
-        evidence?: ToolEvidence[];
-        images?: GeneratedImage[];
-        error?: string;
-      };
-      if (!response.ok || !body.answer) throw new Error(body.error ?? 'AI_ERROR');
-      setMessages((current) => [...current, {
-        role: 'assistant',
-        content: body.answer!,
-        evidence: body.evidence ?? [],
-        images: body.images ?? [],
-      }]);
+        },
+        {
+          signal: controller.signal,
+          onTextDelta: (text) => {
+            if (!text || !isCurrent()) return;
+            setMessages((current) => current.map((message) => (
+              message.id === assistantId
+                ? { ...message, content: `${message.content}${text}` }
+                : message
+            )));
+          },
+        },
+      );
+      if (!isCurrent()) return;
+      setMessages((current) => current.map((message) => (
+        message.id === assistantId
+          ? {
+              ...message,
+              content: result.answer,
+              evidence: result.evidence ?? [],
+              images: result.images ?? [],
+              pending: false,
+            }
+          : message
+      )));
+      setAnnouncement('complete');
     } catch (caught) {
-      setError((caught as Error).message);
+      if (!isCurrent()) return;
+      setMessages((current) => current.filter((message) => message.id !== assistantId));
+      setError(caught instanceof Error ? caught.message : 'UPSTREAM_ERROR');
+      setAnnouncement('idle');
     } finally {
-      setLoading(false);
+      if (requestSequence.current === requestId) {
+        activeRequest.current = null;
+        setLoading(false);
+      }
     }
+  };
+
+  /** Clears the thread and invalidates all callbacks from an active request. */
+  const newConversation = () => {
+    requestSequence.current += 1;
+    activeRequest.current?.abort(new DOMException('New conversation started.', 'AbortError'));
+    activeRequest.current = null;
+    setMessages([]);
+    setInput('');
+    setLoading(false);
+    setError(null);
+    setAnnouncement('idle');
   };
 
   /** Submits the current composer text without navigating away. */
@@ -216,11 +319,15 @@ export default function QuestionsAgent() {
           <p>הסוכן מפעיל כלים על מדדים מחושבים ושולח את התוצאות ל-OpenRouter; אין למודל גישה ישירה לגיליון.</p>
         </div>
         {messages.length > 0 && (
-          <button className="btn" onClick={() => { setMessages([]); setError(null); }}>שיחה חדשה</button>
+          <button className="btn" onClick={newConversation}>שיחה חדשה</button>
         )}
       </header>
 
-      <div className="conversation" aria-live="polite">
+      <div
+        className="conversation"
+        data-testid="questions-conversation"
+        aria-busy={loading}
+      >
         {messages.length === 0 && (
           <div className="question-starter">
             <div className="agent-mark" aria-hidden="true">?</div>
@@ -233,10 +340,19 @@ export default function QuestionsAgent() {
             </div>
           </div>
         )}
-        {messages.map((message, index) => (
-          <article className={`message ${message.role}`} key={`${message.role}-${index}`}>
+        {messages.map((message) => (
+          <article
+            className={`message ${message.role}${message.pending && !message.content ? ' loading-message' : ''}`}
+            key={message.id}
+          >
             <span className="message-role">{message.role === 'user' ? 'אתם' : 'סוכן STS'}</span>
-            <p>{message.content}</p>
+            {message.role === 'user' && <p>{message.content}</p>}
+            {message.role === 'assistant' && message.pending && !message.content && (
+              <p><span /><span /><span /> בודק את הנתונים…</p>
+            )}
+            {message.role === 'assistant' && message.content && (
+              <AssistantAnswer content={message.content} />
+            )}
             {message.images?.map((generated) => (
               <figure className="agent-image" key={generated.assetId}>
                 <img
@@ -258,13 +374,15 @@ export default function QuestionsAgent() {
             {message.role === 'assistant' && <EvidencePanel evidence={message.evidence ?? []} />}
           </article>
         ))}
-        {loading && (
-          <article className="message assistant loading-message">
-            <span className="message-role">סוכן STS</span>
-            <p><span /><span /><span /> בודק את הנתונים…</p>
-          </article>
-        )}
       </div>
+
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {announcement === 'generating'
+          ? 'הסוכן מייצר תשובה…'
+          : announcement === 'complete'
+            ? 'התשובה הושלמה.'
+            : ''}
+      </p>
 
       {error && <div className="question-error" role="alert">{errorMessages[error] ?? 'לא הצלחנו לקבל תשובה. נסו שוב.'}</div>}
 
