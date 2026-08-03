@@ -73,9 +73,7 @@ export const createReportPost = (
     if (acceptsNdjson(request)) {
       return ndjson(request, async ({ signal, progress }) => {
         progress('loading-data');
-        const result = await generate(signal, progress);
-        progress('validating');
-        return result;
+        return generate(signal, progress);
       });
     }
 

@@ -6,6 +6,7 @@ import {
   ndjson,
 } from '../src/lib/http';
 import { generateGroundedInsights } from '../src/lib/ai/insights';
+import { readAiStream } from '../src/lib/ai-stream-client';
 import { createInsightsPost } from '../src/pages/api/ai/insights';
 import { createReportPost } from '../src/pages/api/ai/report';
 import type { SheetRow } from '../src/lib/sheets';
@@ -167,8 +168,10 @@ describe('negotiated AI route streaming', () => {
         generationContext = context as Record<string, unknown>;
         context.onProgress?.('generating');
         context.onProgress?.('generating');
+        context.onProgress?.('validating');
         context.onProgress?.('retrying');
         context.onProgress?.('generating');
+        context.onProgress?.('validating');
         return generatedInsights;
       },
     });
@@ -186,6 +189,7 @@ describe('negotiated AI route streaming', () => {
       { type: 'progress', stage: 'loading-data' },
       { type: 'progress', stage: 'generating' },
       { type: 'progress', stage: 'generating' },
+      { type: 'progress', stage: 'validating' },
       { type: 'progress', stage: 'retrying' },
       { type: 'progress', stage: 'generating' },
       { type: 'progress', stage: 'validating' },
@@ -211,6 +215,66 @@ describe('negotiated AI route streaming', () => {
     ]);
   });
 
+  test('streams real validation stages through a malformed-output retry to the client parser', async () => {
+    const { evidence: _evidence, ...providerOutputWithoutTrend } = generatedInsights;
+    const providerOutput = {
+      ...providerOutputWithoutTrend,
+      trends: [{
+        title: 'מגמה מרכזית',
+        explanation: 'ההכנסות מציגות מגמה חיובית.',
+        evidenceKeys: ['kpi.revenue.current'],
+      }],
+    };
+    let attempts = 0;
+    const handler = createInsightsPost({
+      loadSheetForUser: async () => sheet,
+      generateGroundedInsights: (snapshot, context = {}) => generateGroundedInsights(
+        snapshot,
+        {
+          ...context,
+          providerDependencies: {
+            send: async () => {
+              attempts += 1;
+              async function* chunks() {
+                yield {
+                  choices: [{
+                    delta: {
+                      content: attempts === 1
+                        ? '{"summary":'
+                        : JSON.stringify(providerOutput),
+                    },
+                    finishReason: 'stop',
+                  }],
+                };
+              }
+              return chunks();
+            },
+            now: () => 100,
+            log: () => {},
+          },
+        },
+      ),
+    });
+    const stages: string[] = [];
+
+    const result = await readAiStream<{
+      insights: typeof generatedInsights;
+    }>(await invoke(handler, requestFor('insights')), {
+      onProgress: (stage) => stages.push(stage),
+    });
+
+    expect(attempts).toBe(2);
+    expect(stages).toEqual([
+      'loading-data',
+      'generating',
+      'validating',
+      'retrying',
+      'generating',
+      'validating',
+    ]);
+    expect(result.insights.summary).toBe(generatedInsights.summary);
+  });
+
   test('keeps report generation separate and streams its existing report DTO', async () => {
     let route: unknown;
     const handler = createReportPost({
@@ -218,6 +282,7 @@ describe('negotiated AI route streaming', () => {
       generateGroundedInsights: async (_snapshot, context = {}) => {
         route = context.route;
         context.onProgress?.('generating');
+        context.onProgress?.('validating');
         return generatedInsights;
       },
       now: () => new Date('2026-08-03T09:45:00.000Z'),

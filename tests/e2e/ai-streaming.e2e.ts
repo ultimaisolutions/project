@@ -228,3 +228,23 @@ test('management report exposes its full streamed skeleton and remains usable wi
     .not.toBeNull();
   await expectNoHorizontalOverflow(page);
 });
+
+test('management report hides regeneration progress from print and PDF output', async ({ page }) => {
+  await mountAiScreen(page, {
+    component: 'ReportBuilder',
+    pathname: '/report',
+    endpoint: '/api/ai/report',
+    result: reportResult,
+  });
+
+  await page.getByRole('button', { name: 'יצירת דוח ניהולי' }).click();
+  await page.evaluate(() => (window as BrowserTestWindow).__finishAiTest?.());
+  await expect(page.getByText('הדוח מוכן')).toBeVisible();
+
+  await page.getByRole('button', { name: 'יצירה מחדש' }).click();
+  const progress = page.getByRole('status');
+  await expect(progress).toBeVisible();
+
+  await page.emulateMedia({ media: 'print', reducedMotion: 'reduce' });
+  await expect(progress).toBeHidden();
+});

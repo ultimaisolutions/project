@@ -62,6 +62,60 @@ describe('AI NDJSON browser client', () => {
     expect((failure as Error).message).toBe('AI_INVALID_EVIDENCE');
   });
 
+  test('cancels the response reader after a protocol error', async () => {
+    let cancelled = false;
+    const response = new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('{invalid-json}\n'));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    }), {
+      headers: { 'content-type': 'application/x-ndjson' },
+    });
+
+    let failure: unknown;
+    try {
+      await readAiStream(response);
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toBe('UPSTREAM_ERROR');
+    expect(cancelled).toBe(true);
+  });
+
+  test('cancels the response reader while preserving a progress callback exception', async () => {
+    let cancelled = false;
+    const callbackFailure = new Error('render failed');
+    const response = new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(
+          '{"type":"progress","stage":"generating"}\n',
+        ));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    }), {
+      headers: { 'content-type': 'application/x-ndjson' },
+    });
+
+    let failure: unknown;
+    try {
+      await readAiStream(response, {
+        onProgress: () => { throw callbackFailure; },
+      });
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBe(callbackFailure);
+    expect(cancelled).toBe(true);
+  });
+
   test('cancels the response reader when its request signal is aborted', async () => {
     let cancelled = false;
     const response = new Response(new ReadableStream<Uint8Array>({
@@ -112,5 +166,33 @@ describe('AI NDJSON browser client', () => {
     expect(request?.init).toMatchObject({ method: 'POST' });
     expect(new Headers(request?.init?.headers).get('accept')).toBe('application/x-ndjson');
     expect(result).toEqual({ summary: 'JSON fallback' });
+  });
+
+  test('preserves an arbitrary abort reason when JSON fallback decoding is interrupted', async () => {
+    const abort = new AbortController();
+    const reason = { source: 'navigation', detail: 'decoding interrupted' };
+    let bodyController!: ReadableStreamDefaultController<Uint8Array>;
+    const response = new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        bodyController = controller;
+        controller.enqueue(encoder.encode('{"summary":'));
+      },
+    }), {
+      headers: { 'content-type': 'application/json' },
+    });
+    const reading = readAiStream(response, { signal: abort.signal });
+
+    await Promise.resolve();
+    abort.abort(reason);
+    bodyController.error(new Error('body transport interrupted'));
+
+    let failure: unknown;
+    try {
+      await reading;
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBe(reason);
   });
 });

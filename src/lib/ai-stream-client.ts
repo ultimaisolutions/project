@@ -32,9 +32,9 @@ function symbolicCode(value: unknown) {
 }
 
 function abortReason(signal: AbortSignal) {
-  return signal.reason instanceof Error
-    ? signal.reason
-    : new DOMException('The operation was aborted.', 'AbortError');
+  return typeof signal.reason === 'undefined'
+    ? new DOMException('The operation was aborted.', 'AbortError')
+    : signal.reason;
 }
 
 function parseEvent(value: unknown): AiStreamEvent<unknown> | null {
@@ -58,6 +58,7 @@ async function readJsonFallback<T>(response: Response, signal?: AbortSignal) {
   try {
     body = await response.json();
   } catch {
+    if (signal?.aborted) throw abortReason(signal);
     throw new Error('UPSTREAM_ERROR');
   }
   if (signal?.aborted) throw abortReason(signal);
@@ -123,6 +124,13 @@ export async function readAiStream<T>(
     if (options.signal?.aborted) throw abortReason(options.signal);
     if (!hasResult) throw new Error('UPSTREAM_ERROR');
     return result as T;
+  } catch (error) {
+    try {
+      await reader.cancel(error);
+    } catch {
+      // Preserve the protocol, callback, or abort error that stopped consumption.
+    }
+    throw error;
   } finally {
     options.signal?.removeEventListener('abort', cancel);
     reader.releaseLock();

@@ -5,7 +5,7 @@ import { getServerEnv } from '../env';
 import { AI_MODEL } from './model';
 
 const DEFAULT_TIMEOUT_MS = 120_000;
-export const INSIGHTS_MAX_TOKENS = 8_192;
+export const INSIGHTS_MAX_TOKENS = 20_000;
 
 type StructuredChatOptions<T> = {
   messages: ChatMessages[];
@@ -46,7 +46,15 @@ type StructuredChatChunk = {
   }>;
 };
 
-export type StructuredGenerationStage = 'generating' | 'retrying';
+export type StructuredGenerationStage = 'generating' | 'validating' | 'retrying';
+
+type SanitizedFinishReason =
+  | 'stop'
+  | 'length'
+  | 'error'
+  | 'content_filter'
+  | 'tool_calls'
+  | 'other';
 
 export type StructuredStreamDiagnostic = {
   model?: string;
@@ -55,7 +63,7 @@ export type StructuredStreamDiagnostic = {
     provider: string;
     status: number;
   };
-  finishReason?: string;
+  finishReason?: SanitizedFinishReason;
   promptTokens?: number;
   completionTokens?: number;
   reasoningTokens?: number;
@@ -98,6 +106,17 @@ function isAsyncIterable(value: unknown): value is AsyncIterable<StructuredChatC
   return typeof value === 'object'
     && value !== null
     && Symbol.asyncIterator in value;
+}
+
+function sanitizedFinishReason(finishReason: string): SanitizedFinishReason {
+  if (finishReason === 'stop'
+    || finishReason === 'length'
+    || finishReason === 'error'
+    || finishReason === 'content_filter'
+    || finishReason === 'tool_calls') {
+    return finishReason;
+  }
+  return 'other';
 }
 
 export function isRetryableStructuredOutputError(error: unknown) {
@@ -201,6 +220,15 @@ export function parseStructuredChatContent<T>(
   return validated.data;
 }
 
+function assertSuccessfulFinishReason(finishReason?: string | null) {
+  if (finishReason === 'length') {
+    throw aiError('AI_TRUNCATED_RESPONSE');
+  }
+  if (finishReason !== 'stop') {
+    throw aiError('AI_INVALID_RESPONSE');
+  }
+}
+
 export function parseStructuredChatChoice<T>(
   choice: {
     finishReason?: string | null;
@@ -208,9 +236,7 @@ export function parseStructuredChatChoice<T>(
   } | undefined,
   schema: z.ZodType<T>,
 ) {
-  if (choice?.finishReason === 'length') {
-    throw aiError('AI_TRUNCATED_RESPONSE');
-  }
+  assertSuccessfulFinishReason(choice?.finishReason);
   return parseStructuredChatContent(choice?.message?.content, schema);
 }
 
@@ -251,13 +277,13 @@ export async function consumeStructuredChatStream<T>(
       }
       if (choice?.finishReason) {
         finishReason = choice.finishReason;
-        diagnostic.finishReason = choice.finishReason;
+        diagnostic.finishReason = sanitizedFinishReason(choice.finishReason);
       }
     }
-    return parseStructuredChatChoice({
-      finishReason,
-      message: { content },
-    }, schema);
+    assertSuccessfulFinishReason(finishReason);
+    options.onProgress?.('validating');
+    options.signal?.throwIfAborted();
+    return parseStructuredChatContent(content, schema);
   } finally {
     options.onDiagnostic?.(diagnostic);
   }

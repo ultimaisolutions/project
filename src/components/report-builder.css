@@ -400,7 +400,8 @@
   .mobile-top,
   .bottom-nav,
   .page-head,
-  [data-print-hidden] {
+  [data-print-hidden],
+  .ai-generation-progress {
     display: none !important;
   }
 

@@ -70,7 +70,7 @@ describe('OpenRouter structured output adapter', () => {
     });
 
     expect(result).toEqual({ ok: true });
-    expect(stages).toEqual(['generating', 'generating', 'generating']);
+    expect(stages).toEqual(['generating', 'generating', 'generating', 'validating']);
     expect(diagnostic).toEqual({
       model: 'test/model',
       providerMetadata: {
@@ -154,7 +154,7 @@ describe('OpenRouter structured output adapter', () => {
         messages: [{ role: 'user', content: 'Return JSON.' }],
         schema,
         schemaName: 'health',
-        maxTokens: 8_192,
+        maxTokens: 20_000,
         temperature: 0,
       }, {
         send: async () => chunks(),
@@ -202,7 +202,7 @@ describe('OpenRouter structured output adapter', () => {
       messages: [{ role: 'user', content: 'Return JSON.' }],
       schema,
       schemaName: 'health',
-      maxTokens: 8_192,
+      maxTokens: 20_000,
       temperature: 0,
       route: 'insights',
       attempt: 1,
@@ -250,7 +250,7 @@ describe('OpenRouter structured output adapter', () => {
         messages: [{ role: 'user', content: 'secret prompt' }],
         schema,
         schemaName: 'health',
-        maxTokens: 8_192,
+        maxTokens: 20_000,
         temperature: 0,
         route: 'report',
         attempt: 0,
@@ -273,14 +273,14 @@ describe('OpenRouter structured output adapter', () => {
       messages: [{ role: 'user', content: 'Return JSON.' }],
       schema,
       schemaName: 'health',
-      maxTokens: 8_192,
+      maxTokens: 20_000,
       temperature: 0,
     });
 
     expect(request.chatRequest).toMatchObject({
       model: 'deepseek/deepseek-v4-flash',
       stream: true,
-      maxTokens: 8_192,
+      maxTokens: 20_000,
       provider: {
         requireParameters: true,
         sort: 'throughput',
@@ -355,7 +355,7 @@ describe('OpenRouter structured output adapter', () => {
     }
 
     expect(requests.map((request) => request.chatRequest?.maxTokens))
-      .toEqual([8_192, 8_192]);
+      .toEqual([20_000, 20_000]);
   });
 
   test('parses and validates only textual JSON objects', () => {
@@ -373,6 +373,87 @@ describe('OpenRouter structured output adapter', () => {
       finishReason: 'length',
       message: { content: '{"ok":' },
     }, schema)).toThrow('AI_TRUNCATED_RESPONSE');
+  });
+
+  test('rejects schema-valid content when the stream ends without a finish reason', async () => {
+    async function* chunks() {
+      yield {
+        choices: [{ delta: { content: '{"ok":true}' }, finishReason: null }],
+      };
+    }
+
+    let error: unknown;
+    try {
+      await consumeStructuredChatStream(chunks(), schema);
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toMatchObject({
+      code: 'AI_INVALID_RESPONSE',
+      message: 'AI_INVALID_RESPONSE',
+    });
+  });
+
+  test('rejects abnormal finish reasons without retrying or exposing the reason', async () => {
+    for (const finishReason of ['error', 'content_filter', 'tool_calls']) {
+      let attempts = 0;
+      let error: unknown;
+      try {
+        await withStructuredOutputRetry(async () => {
+          attempts += 1;
+          async function* chunks() {
+            yield {
+              choices: [{ delta: { content: '{"ok":true}' }, finishReason }],
+            };
+          }
+          return consumeStructuredChatStream(chunks(), schema);
+        });
+      } catch (caught) {
+        error = caught;
+      }
+
+      expect(error).toMatchObject({
+        code: 'AI_INVALID_RESPONSE',
+        message: 'AI_INVALID_RESPONSE',
+      });
+      expect(JSON.stringify(error)).not.toContain(finishReason);
+      expect(attempts).toBe(1);
+    }
+  });
+
+  test('normalizes an unknown finish reason before writing diagnostics', async () => {
+    const records: unknown[] = [];
+    async function* chunks() {
+      yield {
+        choices: [{
+          delta: { content: '{"ok":true}' },
+          finishReason: 'secret provider detail',
+        }],
+      };
+    }
+
+    let error: unknown;
+    try {
+      await generateStructuredObject({
+        messages: [{ role: 'user', content: 'Return JSON.' }],
+        schema,
+        schemaName: 'health',
+        maxTokens: 20_000,
+        temperature: 0,
+      }, {
+        send: async () => chunks(),
+        now: () => 100,
+        log: (record: unknown) => records.push(record),
+      });
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toMatchObject({ code: 'AI_INVALID_RESPONSE' });
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ finishReason: 'other' });
+    expect(JSON.stringify(records)).not.toContain('secret provider detail');
   });
 
   test('never retries a streamed token-limit truncation', async () => {
@@ -417,9 +498,10 @@ describe('OpenRouter structured output adapter', () => {
     expect(stages).toEqual(['retrying']);
   });
 
-  test('reports one retry stage before retrying malformed schema output', async () => {
+  test('validates each completed output before retrying malformed schema output', async () => {
     let attempts = 0;
     const stages: string[] = [];
+    const onProgress = (stage: string) => stages.push(stage);
     const result = await withStructuredOutputRetry(async () => {
       attempts += 1;
       async function* chunks() {
@@ -430,12 +512,18 @@ describe('OpenRouter structured output adapter', () => {
           }],
         };
       }
-      return consumeStructuredChatStream(chunks(), schema);
-    }, { onProgress: (stage: string) => stages.push(stage) });
+      return consumeStructuredChatStream(chunks(), schema, { onProgress });
+    }, { onProgress });
 
     expect(result).toEqual({ ok: true });
     expect(attempts).toBe(2);
-    expect(stages).toEqual(['retrying']);
+    expect(stages).toEqual([
+      'generating',
+      'validating',
+      'retrying',
+      'generating',
+      'validating',
+    ]);
   });
 
   test('retries one structurally invalid model response but not configuration failures', async () => {
