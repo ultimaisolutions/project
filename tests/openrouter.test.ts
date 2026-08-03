@@ -36,7 +36,7 @@ describe('OpenRouter structured output adapter', () => {
       maxTokens: 100,
       provider: {
         requireParameters: true,
-        sort: 'latency',
+        sort: 'throughput',
       },
       reasoning: {
         effort: 'none',

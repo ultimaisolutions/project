@@ -75,7 +75,7 @@ export function buildStructuredChatRequest<T>({
       temperature,
       provider: {
         requireParameters: true,
-        sort: 'latency' as const,
+        sort: 'throughput' as const,
       },
       reasoning: {
         effort: 'none' as const,
